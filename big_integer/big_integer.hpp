@@ -52,5 +52,6 @@ class BigInt {
  private:
   std::vector<Byte> digits_;
   bool sign_;
-  static const int kBase = 10;
+  const int kBase = 10;
+  const std::string kInt64MinStr = "-9223372036854775808";
 };

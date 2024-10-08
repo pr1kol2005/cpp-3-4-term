@@ -2,7 +2,7 @@
 
 BigInt::BigInt(int64_t num) {
   if (num == std::numeric_limits<int64_t>::min()) {
-    BigInt temp("-9223372036854775808");
+    BigInt temp(kInt64MinStr);
     *this = temp;
     return;
   }
