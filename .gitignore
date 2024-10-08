@@ -1,4 +1,6 @@
 .vscode
 .DS_store
 big_integer
+geometry
 !big_integer/big_integer.
+!geometry/geometry.
