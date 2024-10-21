@@ -2,14 +2,13 @@
 
 #include <algorithm>
 #include <compare>
+#include <cstdint>
 #include <iostream>
 #include <limits>
 #include <string>
 #include <vector>
 
 class BigInt {
-  using Byte = unsigned char;
-
  public:
   BigInt() = default;
   BigInt(int64_t num);
@@ -25,8 +24,6 @@ class BigInt {
   BigInt operator*(const BigInt& rhs) const;
   BigInt operator/(const BigInt& rhs) const;
   BigInt operator%(const BigInt& rhs) const;
-
-  BigInt& AbsSubstraction(const BigInt& rhs);
 
   BigInt& operator+=(const BigInt& rhs);
   BigInt& operator-=(const BigInt& rhs);
@@ -44,14 +41,17 @@ class BigInt {
 
   BigInt operator-() const;
 
-  BigInt Abs() const;
-
   friend std::ostream& operator<<(std::ostream& out, const BigInt& rhs);
   friend std::istream& operator>>(std::istream& in, BigInt& rhs);
 
  private:
-  std::vector<Byte> digits_;
+  BigInt& AbsSubstraction(const BigInt& rhs);
+  BigInt Abs() const;
+  void ReverseBothDigits(const BigInt& rhs);
+  void RemoveZeros();
+
   bool sign_;
-  const int kBase = 10;
-  const std::string kInt64MinStr = "-9223372036854775808";
+  std::vector<int8_t> digits_;
+  static const int8_t kBase = 10;
+  static const std::string kInt64MinStr;
 };
