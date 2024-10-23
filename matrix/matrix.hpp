@@ -1,38 +1,39 @@
 #include <array>
+#include <vector>
 
-template <size_t N, size_t M, typename T>
+template <std::size_t N, std::size_t M, typename T>
 class Matrix;
 
-template <size_t N, typename T>
+template <std::size_t N, typename T>
 T GetTrace(const Matrix<N, N, T>& matrix) {
   T result = T();
-  for (size_t i = 0; i < N; ++i) {
+  for (std::size_t i = 0; i < N; ++i) {
     result += matrix(i, i);
   }
   return result;
 }
 
-template <size_t N, size_t M, typename T = int64_t>
+template <std::size_t N, std::size_t M, typename T = int64_t>
 class Matrix {
  public:
   Matrix() {
-    for (size_t i = 0; i < N; ++i) {
-      for (size_t j = 0; j < M; ++j) {
+    for (std::size_t i = 0; i < N; ++i) {
+      for (std::size_t j = 0; j < M; ++j) {
         buffer_[i][j] = T();
       }
     }
   }
 
   Matrix(const std::vector<std::vector<T>>& data) {
-    for (size_t i = 0; i < N; ++i) {
-      for (size_t j = 0; j < M; ++j) {
+    for (std::size_t i = 0; i < N; ++i) {
+      for (std::size_t j = 0; j < M; ++j) {
         buffer_[i][j] = data[i][j];
       }
     }
   }
   Matrix(T elem) {
-    for (size_t i = 0; i < N; ++i) {
-      for (size_t j = 0; j < M; ++j) {
+    for (std::size_t i = 0; i < N; ++i) {
+      for (std::size_t j = 0; j < M; ++j) {
         buffer_[i][j] = elem;
       }
     }
@@ -41,8 +42,8 @@ class Matrix {
   ~Matrix() = default;
 
   Matrix& operator+=(const Matrix& other) {
-    for (size_t i = 0; i < N; ++i) {
-      for (size_t j = 0; j < M; ++j) {
+    for (std::size_t i = 0; i < N; ++i) {
+      for (std::size_t j = 0; j < M; ++j) {
         buffer_[i][j] += other(i, j);
       }
     }
@@ -50,8 +51,8 @@ class Matrix {
   }
 
   Matrix& operator-=(const Matrix& other) {
-    for (size_t i = 0; i < N; ++i) {
-      for (size_t j = 0; j < M; ++j) {
+    for (std::size_t i = 0; i < N; ++i) {
+      for (std::size_t j = 0; j < M; ++j) {
         buffer_[i][j] -= other(i, j);
       }
     }
@@ -71,8 +72,8 @@ class Matrix {
   }
 
   Matrix& operator*=(const T& other) {
-    for (size_t i = 0; i < N; ++i) {
-      for (size_t j = 0; j < M; ++j) {
+    for (std::size_t i = 0; i < N; ++i) {
+      for (std::size_t j = 0; j < M; ++j) {
         buffer_[i][j] *= other;
       }
     }
@@ -85,13 +86,13 @@ class Matrix {
     return result;
   }
 
-  template <size_t K>
+  template <std::size_t K>
   friend Matrix<N, K, T> operator*(const Matrix<N, M, T>& left,
                                    const Matrix<M, K, T>& right) {
     Matrix<N, K, T> result;
-    for (size_t i = 0; i < N; ++i) {
-      for (size_t j = 0; j < K; ++j) {
-        for (size_t k = 0; k < M; ++k) {
+    for (std::size_t i = 0; i < N; ++i) {
+      for (std::size_t j = 0; j < K; ++j) {
+        for (std::size_t k = 0; k < M; ++k) {
           result(i, j) += left(i, k) * right(k, j);
         }
       }
@@ -101,8 +102,8 @@ class Matrix {
 
   Matrix<M, N, T> Transposed() const {
     Matrix<M, N, T> result;
-    for (size_t i = 0; i < N; ++i) {
-      for (size_t j = 0; j < M; ++j) {
+    for (std::size_t i = 0; i < N; ++i) {
+      for (std::size_t j = 0; j < M; ++j) {
         result(j, i) = buffer_[i][j];
       }
     }
@@ -111,8 +112,12 @@ class Matrix {
 
   T Trace() const { return GetTrace(*this); }
 
-  T& operator()(size_t i, size_t j) { return buffer_[i][j]; }
-  const T& operator()(size_t i, size_t j) const { return buffer_[i][j]; }
+  T& operator()(std::size_t row, std::size_t column) {
+    return buffer_[row][column];
+  }
+  const T& operator()(std::size_t row, std::size_t column) const {
+    return buffer_[row][column];
+  }
 
   bool operator==(const Matrix<N, M, T>& other) const {
     return buffer_ == other.buffer_;
