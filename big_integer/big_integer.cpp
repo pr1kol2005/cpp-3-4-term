@@ -8,52 +8,61 @@ BigInt::BigInt(int64_t num) : BigInt(std::to_string(num)) {}
 BigInt::BigInt(const std::string& str) {
   auto last = str.rend();
   if (str[0] == '-') {
-    sign_ = false;
+    is_positive_ = false;
     --last;
   } else {
-    sign_ = true;
+    is_positive_ = true;
   }
   for (auto it = str.rbegin(); it != last; it++) {
     digits_.push_back(*it - '0');
   }
   if (digits_.size() == 1 && digits_[0] == 0) {
-    sign_ = true;
+    is_positive_ = true;
   }
   if (digits_.empty()) {
     digits_.push_back(0);
-    sign_ = true;
+    is_positive_ = true;
   }
 }
 
 BigInt::BigInt(const BigInt& other)
-    : sign_(other.sign_), digits_(other.digits_) {}
+    : is_positive_(other.is_positive_), digits_(other.digits_) {}
 
 BigInt& BigInt::operator=(const BigInt& rhs) {
-  sign_ = rhs.sign_;
+  is_positive_ = rhs.is_positive_;
   digits_ = rhs.digits_;
   return *this;
 }
 
+int64_t BigInt::GetRowsSum(const BigInt& rhs, bool addition, std::size_t i) {
+  int64_t curr = 0;
+  if (i < digits_.size()) {
+    curr += digits_[i];
+  }
+  if (i < rhs.digits_.size()) {
+    if (addition) {
+      curr += rhs.digits_[i];
+    } else {
+      curr -= rhs.digits_[i];
+    }
+  }
+  return curr;
+}
+
 BigInt& BigInt::operator+=(const BigInt& rhs) {
-  if (!sign_ && rhs.sign_) {
-    sign_ = true;
+  if (!is_positive_ && rhs.is_positive_) {
+    is_positive_ = true;
     *this = rhs - *this;
     return *this;
   }
-  if (sign_ && !rhs.sign_) {
+  if (is_positive_ && !rhs.is_positive_) {
     *this -= (-rhs);
     return *this;
   }
   int carry = 0;
   digits_.reserve(std::max(digits_.size(), rhs.digits_.size()) + 1);
   for (std::size_t i = 0; i < digits_.size(); i++) {
-    int curr = 0;
-    if (i < digits_.size()) {
-      curr += digits_[i];
-    }
-    if (i < rhs.digits_.size()) {
-      curr += rhs.digits_[i];
-    }
+    int curr = GetRowsSum(rhs, true, i);
     curr += carry;
     digits_[i] = (curr % kBase);
     carry = curr / kBase;
@@ -79,13 +88,7 @@ void BigInt::RemoveZeros() {
 BigInt& BigInt::AbsSubstraction(const BigInt& rhs) {
   int carry = 0;
   for (std::size_t i = 0; i < digits_.size(); i++) {
-    int64_t curr = 0;
-    if (i < digits_.size()) {
-      curr += digits_[i];
-    }
-    if (i < rhs.digits_.size()) {
-      curr -= rhs.digits_[i];
-    }
+    int64_t curr = GetRowsSum(rhs, false, i);
     curr -= carry;
     if (curr < 0) {
       curr += kBase;
@@ -100,23 +103,23 @@ BigInt& BigInt::AbsSubstraction(const BigInt& rhs) {
 }
 
 BigInt& BigInt::operator-=(const BigInt& rhs) {
-  if (!sign_ && rhs.sign_) {
-    sign_ = true;
+  if (!is_positive_ && rhs.is_positive_) {
+    is_positive_ = true;
     *this += rhs;
-    sign_ = !sign_;
+    is_positive_ = !is_positive_;
     return *this;
   }
-  if (sign_ && !rhs.sign_) {
+  if (is_positive_ && !rhs.is_positive_) {
     *this += (-rhs);
     return *this;
   }
-  if (!sign_ && !rhs.sign_) {
+  if (!is_positive_ && !rhs.is_positive_) {
     *this = -rhs - -*this;
     return *this;
   }
   if (rhs > *this) {
     *this = rhs - *this;
-    sign_ = !sign_;
+    is_positive_ = !is_positive_;
     return *this;
   }
   return AbsSubstraction(rhs);
@@ -153,7 +156,7 @@ BigInt& BigInt::operator*=(const BigInt& rhs) {
 
   RemoveZeros();
 
-  sign_ = (sign_ == rhs.sign_);
+  is_positive_ = (is_positive_ == rhs.is_positive_);
   return *this;
 }
 
@@ -163,16 +166,11 @@ BigInt BigInt::operator*(const BigInt& rhs) const {
   return temp;
 }
 
-BigInt& BigInt::operator/=(const BigInt& rhs) {
-  if (Abs() < rhs.Abs()) {
-    *this = 0;
-    return *this;
-  }
-
+void BigInt::Divide(const BigInt& rhs, bool is_module) {
   int curr = 0;
   BigInt temp = 0;
-  std::vector<int8_t> column_sum;
   int i = digits_.size() - 1;
+  std::vector<int8_t> column_sum;
 
   for (; temp * kBase + digits_[i] < rhs; --i) {
     temp *= kBase;
@@ -183,11 +181,27 @@ BigInt& BigInt::operator/=(const BigInt& rhs) {
     for (curr = kBase - 1; BigInt(curr) * rhs > temp; --curr) {
     }
     temp -= BigInt(curr) * rhs;
-    column_sum.push_back(curr);
+    if (!is_module) {
+      column_sum.push_back(curr);
+    }
   }
-  digits_ = column_sum;
+  if (is_module) {
+    *this = temp;
+  } else {
+    digits_ = column_sum;
+  }
+}
+
+BigInt& BigInt::operator/=(const BigInt& rhs) {
+  if (Abs() < rhs.Abs()) {
+    *this = 0;
+    return *this;
+  }
+
+  Divide(rhs, false);
+
   std::reverse(digits_.begin(), digits_.end());
-  sign_ = (sign_ == rhs.sign_);
+  is_positive_ = (is_positive_ == rhs.is_positive_);
   return *this;
 }
 
@@ -198,30 +212,16 @@ BigInt BigInt::operator/(const BigInt& rhs) const {
 }
 
 BigInt& BigInt::operator%=(const BigInt& rhs) {
-  bool new_sign = sign_;
-  sign_ = true;
+  bool new_sign = is_positive_;
+  is_positive_ = true;
   if (*this < rhs.Abs()) {
-    sign_ = new_sign;
+    is_positive_ = new_sign;
     return *this;
   }
 
-  int curr = 0;
-  BigInt temp = 0;
-  int i = digits_.size() - 1;
+  Divide(rhs, true);
 
-  for (; temp * kBase + digits_[i] < rhs; --i) {
-    temp *= kBase;
-    temp += digits_[i];
-  }
-  while (i >= 0) {
-    temp = temp * kBase + digits_[i];
-    for (curr = kBase - 1; BigInt(curr) * rhs > temp; --curr) {
-    }
-    temp -= BigInt(curr) * rhs;
-    --i;
-  }
-  *this = temp;
-  sign_ = new_sign;
+  is_positive_ = new_sign;
   return *this;
 }
 
@@ -253,18 +253,11 @@ BigInt BigInt::operator--(int) {
   return temp;
 }
 
-bool BigInt::operator==(const BigInt& rhs) const {
-  if (sign_ != rhs.sign_) {
-    return false;
-  }
-  return digits_ == rhs.digits_;
-}
-
 std::strong_ordering BigInt::operator<=>(const BigInt& rhs) const {
-  if (!sign_ && rhs.sign_) {
+  if (!is_positive_ && rhs.is_positive_) {
     return std::strong_ordering::less;
   }
-  if (sign_ && !rhs.sign_) {
+  if (is_positive_ && !rhs.is_positive_) {
     return std::strong_ordering::greater;
   }
 
@@ -273,7 +266,7 @@ std::strong_ordering BigInt::operator<=>(const BigInt& rhs) const {
   std::reverse(lhs_reversed.begin(), lhs_reversed.end());
   std::reverse(rhs_reversed.begin(), rhs_reversed.end());
 
-  if (!sign_ && !rhs.sign_) {
+  if (!is_positive_ && !rhs.is_positive_) {
     if (digits_.size() != rhs.digits_.size()) {
       return rhs.digits_.size() <=> digits_.size();
     }
@@ -288,19 +281,19 @@ std::strong_ordering BigInt::operator<=>(const BigInt& rhs) const {
 BigInt BigInt::operator-() const {
   BigInt res(*this);
   if (digits_.size() != 1 || digits_[0] != 0) {
-    res.sign_ = !res.sign_;
+    res.is_positive_ = !res.is_positive_;
   }
   return res;
 }
 
 BigInt BigInt::Abs() const {
   BigInt res(*this);
-  res.sign_ = true;
+  res.is_positive_ = true;
   return res;
 }
 
 std::ostream& operator<<(std::ostream& out, const BigInt& rhs) {
-  if (!rhs.sign_) {
+  if (!rhs.is_positive_) {
     out << '-';
   }
   for (auto it = rhs.digits_.rbegin(); it != rhs.digits_.rend(); it++) {

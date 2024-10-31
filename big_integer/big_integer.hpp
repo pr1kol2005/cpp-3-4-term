@@ -31,7 +31,7 @@ class BigInt {
   BigInt& operator/=(const BigInt& rhs);
   BigInt& operator%=(const BigInt& rhs);
 
-  bool operator==(const BigInt& rhs) const;
+  bool operator==(const BigInt& rhs) const = default;
   std::strong_ordering operator<=>(const BigInt& rhs) const;
 
   BigInt& operator++();
@@ -45,12 +45,14 @@ class BigInt {
   friend std::istream& operator>>(std::istream& in, BigInt& rhs);
 
  private:
+  int64_t GetRowsSum(const BigInt& rhs, bool addition, std::size_t i);
   BigInt& AbsSubstraction(const BigInt& rhs);
   BigInt Abs() const;
   void ReverseBothDigits(const BigInt& rhs);
   void RemoveZeros();
+  void Divide(const BigInt& rhs, bool is_module);
 
-  bool sign_;
+  bool is_positive_;
   std::vector<int8_t> digits_;
   static const int8_t kBase = 10;
   static const std::string kInt64MinStr;
