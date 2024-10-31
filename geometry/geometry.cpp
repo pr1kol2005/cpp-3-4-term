@@ -36,6 +36,24 @@ bool IsSegmentCrossesLine(const Point& start_i, const Point& end_i,
   return (a_b ^ a_c) * (a_b ^ a_d) <= 0;
 };
 
+bool DoSegmentsContainsTheirEnds(const Point& start_1_a, const Point& end_1_b,
+                                 const Point& start_2_c, const Point& end_2_d) {
+  return IsPointOnSegment(start_1_a, end_1_b, start_2_c) ||
+         IsPointOnSegment(start_1_a, end_1_b, end_2_d) ||
+         IsPointOnSegment(start_2_c, end_2_d, start_1_a) ||
+         IsPointOnSegment(start_2_c, end_2_d, end_1_b);
+}
+
+bool DoCdOnLineWithAbOrAbContainsCdEnds(const Point& start_1_a,
+                                        const Point& end_1_b,
+                                        const Point& start_2_c,
+                                        const Point& end_2_d) {
+  return IsPointOnSegment(start_1_a, end_1_b, start_2_c) ||
+         IsPointOnSegment(start_1_a, end_1_b, end_2_d) ||
+         (IsPointOnSegment(start_2_c, end_2_d, start_1_a) &&
+          IsPointOnSegment(start_2_c, end_2_d, end_1_b));
+}
+
 bool IntersectSegments(const Point& start_1_a, const Point& end_1_b,
                        const Point& start_2_c, const Point& end_2_d) {
   Vector a_b(start_1_a, end_1_b);
@@ -45,18 +63,13 @@ bool IntersectSegments(const Point& start_1_a, const Point& end_1_b,
   Vector c_a(start_2_c, start_1_a);
   Vector c_b(start_2_c, end_1_b);
   if (a_b.LengthSquared() != 0 && c_d.LengthSquared() != 0) {
-    if (IsPointOnSegment(start_1_a, end_1_b, start_2_c) ||
-        IsPointOnSegment(start_1_a, end_1_b, end_2_d) ||
-        IsPointOnSegment(start_2_c, end_2_d, start_1_a) ||
-        IsPointOnSegment(start_2_c, end_2_d, end_1_b)) {
+    if (DoSegmentsContainsTheirEnds(start_1_a, end_1_b, start_2_c, end_2_d)) {
       return true;
     }
     if ((a_b ^ a_c) == 0 && (a_b ^ a_d) == 0 && (c_d ^ c_a) == 0 &&
         (c_d ^ c_b) == 0) {
-      return IsPointOnSegment(start_1_a, end_1_b, start_2_c) ||
-             IsPointOnSegment(start_1_a, end_1_b, end_2_d) ||
-             (IsPointOnSegment(start_2_c, end_2_d, start_1_a) &&
-              IsPointOnSegment(start_2_c, end_2_d, end_1_b));
+      return DoCdOnLineWithAbOrAbContainsCdEnds(start_1_a, end_1_b, start_2_c,
+                                                end_2_d);
     }
     return IsSegmentCrossesLine(start_1_a, end_1_b, start_2_c, end_2_d) &&
            IsSegmentCrossesLine(start_2_c, end_2_d, start_1_a, end_1_b);
@@ -111,7 +124,7 @@ bool IsSegmentCrossesRay(const Point& start_a, const Point& end_b,
 
 Vector::Vector() = default;
 
-Vector::Vector(int64_t xxx, int64_t yyy) : x_(xxx), y_(yyy) {}
+Vector::Vector(int64_t init_x, int64_t init_y) : x_(init_x), y_(init_y) {}
 
 Vector::Vector(const Point& start, const Point& end)
     : x_(end.GetX() - start.GetX()), y_(end.GetY() - start.GetY()) {}
@@ -194,7 +207,7 @@ int64_t Vector::LengthSquared() const { return (x_ * x_) + (y_ * y_); }
 
 Point::Point() = default;
 
-Point::Point(int64_t xxx, int64_t yyy) : x_(xxx), y_(yyy) {}
+Point::Point(int64_t init_x, int64_t init_y) : x_(init_x), y_(init_y) {}
 
 Point::Point(const Point& point) : x_(point.x_), y_(point.y_) {}
 
@@ -237,30 +250,31 @@ Point* Point::Clone() const {
 
 Segment::Segment() = default;
 
-Segment::Segment(const Point& start, const Point& end) : a_(start), b_(end) {}
+Segment::Segment(const Point& start, const Point& end)
+    : start_(start), end_(end) {}
 
-Point Segment::GetA() const { return a_; }
+Point Segment::GetA() const { return start_; }
 
-Point Segment::GetB() const { return b_; }
+Point Segment::GetB() const { return end_; }
 
 Segment::~Segment() = default;
 
 Segment& Segment::Move(const Vector& vector) {
-  a_.Move(vector);
-  b_.Move(vector);
+  start_.Move(vector);
+  end_.Move(vector);
   return *this;
 }
 
 bool Segment::ContainsPoint(const Point& point) const {
-  return IsPointOnSegment(a_, b_, point);
+  return IsPointOnSegment(start_, end_, point);
 }
 
 bool Segment::CrossSegment(const Segment& segment) const {
-  return IntersectSegments(a_, b_, segment.a_, segment.b_);
+  return IntersectSegments(start_, end_, segment.start_, segment.end_);
 }
 
 Segment* Segment::Clone() const {
-  Segment* result = new Segment(a_, b_);
+  Segment* result = new Segment(start_, end_);
   return result;
 }
 
@@ -268,34 +282,34 @@ Segment* Segment::Clone() const {
 
 Line::Line() = default;
 
-Line::Line(const Point& start, const Point& end) : a_(start), b_(end) {}
+Line::Line(const Point& start, const Point& end) : start_(start), end_(end) {}
 
-int64_t Line::GetA() const { return a_.GetY() - b_.GetY(); }
+int64_t Line::GetA() const { return start_.GetY() - end_.GetY(); }
 
-int64_t Line::GetB() const { return b_.GetX() - a_.GetX(); }
+int64_t Line::GetB() const { return end_.GetX() - start_.GetX(); }
 
 int64_t Line::GetC() const {
-  return -(GetA() * a_.GetX()) - (GetB() * a_.GetY());
+  return -(GetA() * start_.GetX()) - (GetB() * start_.GetY());
 }
 
 Line::~Line() = default;
 
 Line& Line::Move(const Vector& vector) {
-  a_.Move(vector);
-  b_.Move(vector);
+  start_.Move(vector);
+  end_.Move(vector);
   return *this;
 }
 
 bool Line::ContainsPoint(const Point& point) const {
-  return IsPointOnLine(a_, b_, point);
+  return IsPointOnLine(start_, end_, point);
 }
 
 bool Line::CrossSegment(const Segment& segment) const {
-  return IsSegmentCrossesLine(a_, b_, segment.GetA(), segment.GetB());
+  return IsSegmentCrossesLine(start_, end_, segment.GetA(), segment.GetB());
 }
 
 Line* Line::Clone() const {
-  Line* result = new Line(a_, b_);
+  Line* result = new Line(start_, end_);
   return result;
 }
 
@@ -303,30 +317,30 @@ Line* Line::Clone() const {
 
 Ray::Ray() = default;
 
-Ray::Ray(const Point& start, const Point& end) : a_(start), b_(end) {}
+Ray::Ray(const Point& start, const Point& end) : start_(start), end_(end) {}
 
-Point Ray::GetA() const { return a_; }
+Point Ray::GetA() const { return start_; }
 
-Vector Ray::GetVector() const { return b_ - a_; }
+Vector Ray::GetVector() const { return end_ - start_; }
 
 Ray::~Ray() = default;
 
 Ray& Ray::Move(const Vector& vector) {
-  a_.Move(vector);
-  b_.Move(vector);
+  start_.Move(vector);
+  end_.Move(vector);
   return *this;
 }
 
 bool Ray::ContainsPoint(const Point& point) const {
-  return IsPointOnRay(a_, b_, point);
+  return IsPointOnRay(start_, end_, point);
 }
 
 bool Ray::CrossSegment(const Segment& segment) const {
-  return IsSegmentCrossesRay(a_, b_, segment.GetA(), segment.GetB());
+  return IsSegmentCrossesRay(start_, end_, segment.GetA(), segment.GetB());
 }
 
 Ray* Ray::Clone() const {
-  Ray* result = new Ray(a_, b_);
+  Ray* result = new Ray(start_, end_);
   return result;
 }
 

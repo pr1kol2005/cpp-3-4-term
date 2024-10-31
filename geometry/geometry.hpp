@@ -14,7 +14,7 @@ class Vector {
  public:
   Vector();
   Vector(const Point& start, const Point& end);
-  Vector(int64_t xxx, int64_t yyy);
+  Vector(int64_t init_x, int64_t init_y);
   ~Vector() = default;
 
   int64_t operator*(const Vector& rhs) const;
@@ -61,7 +61,7 @@ class IShape {
 class Point : public IShape {
  public:
   Point();
-  Point(int64_t xxx, int64_t yyy);
+  Point(int64_t init_x, int64_t init_y);
   Point(const Point& point);
 
   Point operator-() const;
@@ -99,8 +99,8 @@ class Segment : public IShape {
   Segment* Clone() const override;
 
  private:
-  Point a_;
-  Point b_;
+  Point start_;
+  Point end_;
 };
 
 // ANCHOR Line
@@ -121,8 +121,8 @@ class Line : public IShape {
   Line* Clone() const override;
 
  private:
-  Point a_;
-  Point b_;
+  Point start_;
+  Point end_;
 };
 
 // ANCHOR Ray
@@ -142,8 +142,8 @@ class Ray : public IShape {
   Ray* Clone() const override;
 
  private:
-  Point a_;
-  Point b_;
+  Point start_;
+  Point end_;
 };
 
 // ANCHOR Circle
