@@ -21,38 +21,45 @@ class Matrix {
 
  public:
   Matrix() {
-    DoForEveryElement([](std::size_t i, std::size_t j, Buffer& buffer) {
-      buffer[i][j] = T();
-    });
+    DoForEveryElement([](std::size_t index_i, std::size_t index_j,
+                         Buffer& buffer) { buffer[index_i][index_j] = T(); });
   }
 
   Matrix(const std::vector<std::vector<T>>& data) {
     DoForEveryElement(
-        [](std::size_t i, std::size_t j, Buffer& buffer,
+        [](std::size_t index_i, std::size_t index_j, Buffer& buffer,
            const std::vector<std::vector<T>>& data) {
-          buffer[i][j] = data[i][j];
+          buffer[index_i][index_j] = data[index_i][index_j];
         },
         data);
   }
   Matrix(T elem) {
-    DoForEveryElement([](std::size_t i, std::size_t j, Buffer& buffer,
-                         T elem) { buffer[i][j] = elem; },
-                      elem);
+    DoForEveryElement(
+        [](std::size_t index_i, std::size_t index_j, Buffer& buffer, T elem) {
+          buffer[index_i][index_j] = elem;
+        },
+        elem);
   }
 
   ~Matrix() = default;
 
   Matrix& operator+=(const Matrix& other) {
-    DoForEveryElement([](std::size_t i, std::size_t j, Buffer& buffer,
-                         const Matrix& other) { buffer[i][j] += other(i, j); },
-                      other);
+    DoForEveryElement(
+        [](std::size_t index_i, std::size_t index_j, Buffer& buffer,
+           const Matrix& other) {
+          buffer[index_i][index_j] += other(index_i, index_j);
+        },
+        other);
     return *this;
   }
 
   Matrix& operator-=(const Matrix& other) {
-    DoForEveryElement([](std::size_t i, std::size_t j, Buffer& buffer,
-                         const Matrix& other) { buffer[i][j] -= other(i, j); },
-                      other);
+    DoForEveryElement(
+        [](std::size_t index_i, std::size_t index_j, Buffer& buffer,
+           const Matrix& other) {
+          buffer[index_i][index_j] -= other(index_i, index_j);
+        },
+        other);
     return *this;
   }
 
@@ -69,9 +76,10 @@ class Matrix {
   }
 
   Matrix& operator*=(const T& other) {
-    DoForEveryElement([](std::size_t i, std::size_t j, Buffer& buffer,
-                         const T& other) { buffer[i][j] *= other; },
-                      other);
+    DoForEveryElement(
+        [](std::size_t index_i, std::size_t index_j, Buffer& buffer,
+           const T& other) { buffer[index_i][index_j] *= other; },
+        other);
     return *this;
   }
 
