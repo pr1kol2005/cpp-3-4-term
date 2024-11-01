@@ -1,8 +1,4 @@
-.vscode
-.DS_store
-big_integer
-geometry
-matrix
+*
 !big_integer/big_integer.
 !geometry/geometry.
 !matrix/matrix.
