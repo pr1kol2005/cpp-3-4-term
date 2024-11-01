@@ -1,4 +1,5 @@
 #include <array>
+#include <cstdint>
 #include <vector>
 
 template <std::size_t N, std::size_t M, typename T>
