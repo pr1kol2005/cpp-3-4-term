@@ -2,6 +2,7 @@
 
 // ANCHOR Functions
 
+namespace geometry_utils {
 bool IsPointOnLine(const Point& start, const Point& end, const Point& point) {
   Vector a_b(start, end);
   Vector a_p(start, point);
@@ -119,6 +120,7 @@ bool IsSegmentCrossesRay(const Point& start_a, const Point& end_b,
   }
   return start_a.ContainsPoint(start_c);
 };
+}  // namespace geometry_utils
 
 // ANCHOR Vector
 
@@ -238,7 +240,8 @@ bool Point::ContainsPoint(const Point& point) const {
 }
 
 bool Point::CrossSegment(const Segment& segment) const {
-  return IsPointOnSegment(segment.GetA(), segment.GetB(), *this);
+  return geometry_utils::IsPointOnSegment(segment.GetA(), segment.GetB(),
+                                          *this);
 }
 
 Point* Point::Clone() const {
@@ -266,11 +269,12 @@ Segment& Segment::Move(const Vector& vector) {
 }
 
 bool Segment::ContainsPoint(const Point& point) const {
-  return IsPointOnSegment(start_, end_, point);
+  return geometry_utils::IsPointOnSegment(start_, end_, point);
 }
 
 bool Segment::CrossSegment(const Segment& segment) const {
-  return IntersectSegments(start_, end_, segment.start_, segment.end_);
+  return geometry_utils::IntersectSegments(start_, end_, segment.start_,
+                                           segment.end_);
 }
 
 Segment* Segment::Clone() const {
@@ -301,11 +305,12 @@ Line& Line::Move(const Vector& vector) {
 }
 
 bool Line::ContainsPoint(const Point& point) const {
-  return IsPointOnLine(start_, end_, point);
+  return geometry_utils::IsPointOnLine(start_, end_, point);
 }
 
 bool Line::CrossSegment(const Segment& segment) const {
-  return IsSegmentCrossesLine(start_, end_, segment.GetA(), segment.GetB());
+  return geometry_utils::IsSegmentCrossesLine(start_, end_, segment.GetA(),
+                                              segment.GetB());
 }
 
 Line* Line::Clone() const {
@@ -332,11 +337,12 @@ Ray& Ray::Move(const Vector& vector) {
 }
 
 bool Ray::ContainsPoint(const Point& point) const {
-  return IsPointOnRay(start_, end_, point);
+  return geometry_utils::IsPointOnRay(start_, end_, point);
 }
 
 bool Ray::CrossSegment(const Segment& segment) const {
-  return IsSegmentCrossesRay(start_, end_, segment.GetA(), segment.GetB());
+  return geometry_utils::IsSegmentCrossesRay(start_, end_, segment.GetA(),
+                                             segment.GetB());
 }
 
 Ray* Ray::Clone() const {
