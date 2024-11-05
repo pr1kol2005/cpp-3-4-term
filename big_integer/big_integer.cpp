@@ -114,7 +114,8 @@ BigInt& BigInt::operator-=(const BigInt& rhs) {
     return *this;
   }
   if (!is_positive_ && !rhs.is_positive_) {
-    *this = -rhs - -*this;
+    is_positive_ = !is_positive_;
+    *this = -rhs - *this;
     return *this;
   }
   if (rhs > *this) {

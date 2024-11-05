@@ -14,6 +14,7 @@ class BigInt {
   BigInt(int64_t num);
   BigInt(const std::string& str);
   BigInt(const BigInt& other);
+  BigInt(BigInt&& other) = default;
 
   BigInt& operator=(const BigInt& rhs);
 
