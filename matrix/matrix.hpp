@@ -36,9 +36,8 @@ class Matrix {
   }
   Matrix(const T& elem) {
     DoForEveryElement(
-        [](std::size_t index_i, std::size_t index_j, Buffer& buffer, const T& elem) {
-          buffer[index_i][index_j] = elem;
-        },
+        [](std::size_t index_i, std::size_t index_j, Buffer& buffer,
+           const T& elem) { buffer[index_i][index_j] = elem; },
         elem);
   }
 
