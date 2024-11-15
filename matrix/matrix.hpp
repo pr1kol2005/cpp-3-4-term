@@ -5,7 +5,7 @@
 template <std::size_t N, std::size_t M, typename T>
 class Matrix;
 
-namespace matrix_utils {
+namespace utils {
 template <std::size_t N, typename T>
 T GetTrace(const Matrix<N, N, T>& matrix) {
   T result = T();
@@ -14,7 +14,7 @@ T GetTrace(const Matrix<N, N, T>& matrix) {
   }
   return result;
 }
-}  // namespace matrix_utils
+}  // namespace utils
 
 template <std::size_t N, std::size_t M, typename T = int64_t>
 class Matrix {
@@ -113,7 +113,7 @@ class Matrix {
     return result;
   }
 
-  T Trace() const { return matrix_utils::GetTrace(*this); }
+  T Trace() const { return utils::GetTrace(*this); }
 
   T& operator()(std::size_t row, std::size_t column) {
     return buffer_[row][column];
