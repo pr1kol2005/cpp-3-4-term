@@ -34,9 +34,9 @@ class Matrix {
         },
         data);
   }
-  Matrix(T elem) {
+  Matrix(const T& elem) {
     DoForEveryElement(
-        [](std::size_t index_i, std::size_t index_j, Buffer& buffer, T elem) {
+        [](std::size_t index_i, std::size_t index_j, Buffer& buffer, const T& elem) {
           buffer[index_i][index_j] = elem;
         },
         elem);
@@ -129,7 +129,7 @@ class Matrix {
 
  private:
   template <typename Func, typename... Args>
-  void DoForEveryElement(Func func, Args... args) {
+  void DoForEveryElement(Func func, Args&&... args) {
     for (std::size_t i = 0; i < N; ++i) {
       for (std::size_t j = 0; j < M; ++j) {
         func(i, j, buffer_, args...);
