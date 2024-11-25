@@ -13,13 +13,13 @@ namespace strategy {
 template <typename ArrayType>
 struct DefaultCreation {
   template <typename... Args>
-  static ArrayType& create(Args&&... args) {
+  static ArrayType create(Args&&... args) {
     return ArrayType(std::forward<Args>(args)...);
   }
 
-  static void copy(ArrayType lhs&, const ArrayType& rhs) {
-    // TODO : copy
-  }
+  // static void copy(ArrayType& lhs, const ArrayType& rhs) {
+  //   // TODO : copy
+  // }
 };
 
 template <typename Tuple, typename... Args, std::size_t... I>
@@ -42,8 +42,11 @@ struct Singleton {
   static inline std::tuple<> stored_args{};
 
  public:
+  Singleton(Singleton& other) = delete;
+  Singleton& operator=(Singleton& other) = delete;
+
   template <typename... Args>
-  static ArrayType& create(Args&&... args) {
+  static ArrayType create(Args&&... args) {
     if (!instance) {
       instance = new ArrayType(std::forward<Args>(args)...);
       stored_args = std::make_tuple(args...);
@@ -52,8 +55,6 @@ struct Singleton {
     }
     return *instance;
   }
-
-  static void copy(ArrayType lhs&, const ArrayType& rhs) = delete;
 };
 
 template <typename ArrayType>
@@ -61,15 +62,15 @@ struct CountedCreation {
   static inline std::size_t count{0};
 
   template <typename... Args>
-  static ArrayType& create(Args&&... args) {
+  static ArrayType create(Args&&... args) {
     ++count;
     return ArrayType(std::forward<Args>(args)...);
   }
 
-  static void copy(ArrayType lhs&, const ArrayType& rhs) {
-    // TODO : copy
-    ++count;
-  }
+  // static void copy(ArrayType& lhs, const ArrayType& rhs) {
+  //   // TODO : copy
+  //   ++count;
+  // }
 
   static std::size_t get_created_count() { return count; }
 };
@@ -116,8 +117,27 @@ class ArrayIterator {
   // TODO : ArrayIterator
 };
 
+template<typename T, std::size_t Extent>
+class DataHolder {
+ protected:
+  T buffer_[Extent];
+};
+
+template<typename T>
+class DataHolder<T, kDynamicExtent> {
+ protected:
+  T* buffer_;
+  std::size_t size_;
+  std::size_t capacity_;
+  memres::MemoryResource* resource_;
+};
+
+template<typename T>
+class DataHolder<T, 0> {
+};
+
 template <typename T, std::size_t Extent, template <typename> typename Creation>
-class ArrayBase {
+class ArrayBase : public DataHolder<T, Extent> {
   // TODO : ArrayBase
  public:
   using iterator = ArrayIterator<T>;
@@ -161,33 +181,16 @@ class ArrayBase {
 
   const_reverse_iterator crbegin() const;
   const_reverse_iterator crend() const;
-
- protected:
-  T* buffer_;
-  std::size_t size_;
 };
 
 }  // namespace details
 
 template <typename T, std::size_t Extent, template <typename> typename Creation = strategy::DefaultCreation>
-class Array : public details::ArrayBase<T, Extent, Creation> {
+class Array : public details::ArrayBase<T, Extent, Creation>, public Creation<Array<T, Extent, Creation>> {
   // TODO : Array
  public:
-  Array(const Array& other) {
-    if (this != &other) {
-      Creation<Array>::copy(*this, other); 
-    }
-  }
-
-  Array& operator=(const Array& other) {
-    if (this != &other) {
-      Creation<Array>::copy(*this, other); 
-    }
-    return *this;
-  }
-
   template <typename... Args>
-  static Array& create(Args&&... args) {
+  static Array create(Args&&... args) {
     return Creation<Array>::create(std::forward<Args>(args)...);
   }
 
@@ -195,40 +198,21 @@ class Array : public details::ArrayBase<T, Extent, Creation> {
   // TODO : Make visiable to strategy class
   template <typename... Args>
   Array(Args&&... args) {
-    this->buffer_ = new T[Extent]();
-    this->size_ = 0;
-    T temp[] = {std::forward<Args>(args)...};
-    for (std::size_t i = 0; i < sizeof...(args); ++i) {
-      this->buffer_[i] = temp[i];
-      ++this->size_;
-    }
+    static_assert(Extent >= sizeof...(args), "Too many arguments");
+    std::size_t index = 0;
+    ((this->buffer_[index++] = std::forward<Args>(args)), ...);
   }
 
-  // friend class creation::Singleton<Array>;
-  // friend class creation::CountedCreation<Array>;
-  // friend class creation::DefaultCreation<Array>;
+  friend class Creation<Array>;
 };
 
 template <typename T, template <typename> typename Creation>
 class Array<T, kDynamicExtent, Creation>
-    : public details::ArrayBase<T, kDynamicExtent, Creation> {
+    : public details::ArrayBase<T, kDynamicExtent, Creation>, public Creation<Array<T, kDynamicExtent, Creation>> {
   // TODO : Vector
  public:
-  Array(const Array& other) {
-    if (this != &other) {
-      Creation<Array>::copy(*this, other); 
-    }
-  }
-
-  Array& operator=(const Array& other) {
-    if (this != &other) {
-      Creation<Array>::copy(*this, other); 
-    }
-    return *this;
-  }
-
   template <typename... Args>
-  static Array& create(Args&&... args) {
+  static Array create(Args&&... args) {
     return Creation<Array>::create(std::forward<Args>(args)...);
   }
 
@@ -244,8 +228,7 @@ class Array<T, kDynamicExtent, Creation>
   Array(std::size_t count = 0, const T& value = T(),
         memres::MemoryResource* resource = memres::GetDefaultResource());
 
-  std::size_t capacity_;
-  memres::MemoryResource* resource_;
+  friend class Creation<Array>;
 };
 
 namespace traits {
