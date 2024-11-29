@@ -325,7 +325,7 @@ template <typename T, std::size_t Extent,
 class Array : public details::ArrayBase<T, Extent>,
               public Creation<Array<T, Extent, Creation>> {
  public:
-  ~Array() = default;
+  ~Array() { std::destroy(this->begin(), this->end()); };
 
   template <typename... Args>
   static decltype(auto) create(Args&&... args) {
