@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
+#include <list>
 #include <memory>
 #include <stdexcept>
 #include <tuple>
@@ -10,7 +11,6 @@
 inline constexpr std::size_t kDynamicExtent = static_cast<std::size_t>(-1);
 
 namespace strategy {
-// TODO : Stategies
 
 template <typename ArrayType>
 struct DefaultCreation {
@@ -19,12 +19,9 @@ struct DefaultCreation {
     return ArrayType(std::forward<Args>(args)...);
   }
   DefaultCreation() = default;
-  DefaultCreation(DefaultCreation& other) = default;
-  DefaultCreation& operator=(DefaultCreation& other) = default;
-
-  // static void object_copied_response() {}
-
-  static void object_destroyed_response() {}
+  DefaultCreation(const DefaultCreation& other) = default;
+  DefaultCreation& operator=(const DefaultCreation& other) = default;
+  ~DefaultCreation() = default;
 };
 
 template <typename Tuple, typename... Args, std::size_t... I>
@@ -42,39 +39,61 @@ template <typename ArrayType>
 struct Singleton {
  private:
   static inline ArrayType* instance{nullptr};
-  static inline std::tuple<> stored_args{};
+
+  template <typename... Args>
+  struct ArgumentsStorage {
+    static inline std::tuple<std::decay_t<Args>...> stored_args{};
+  };
 
  public:
   Singleton() = default;
-  Singleton(Singleton& other) = delete;
-  Singleton& operator=(Singleton& other) = delete;
+  Singleton(const Singleton& other) = delete;
+  Singleton& operator=(const Singleton& other) = delete;
+
+  ~Singleton() {
+    delete instance;
+    instance = nullptr;
+  }
 
   template <typename... Args>
-  static ArrayType create(Args&&... args) {
+  static ArrayType& create(Args&&... args) {
     if (!instance) {
       instance = new ArrayType(std::forward<Args>(args)...);
-      stored_args = std::make_tuple(args...);
-    } else if (!args_math(stored_args, std::forward<Args>(args)...)) {
+      ArgumentsStorage<Args...>::stored_args =
+          std::make_tuple(std::forward<Args>(args)...);
+    } else if (!args_match(ArgumentsStorage<Args...>::stored_args,
+                           std::make_tuple(std::forward<Args>(args)...))) {
       throw std::runtime_error("Singleton already created");
     }
     return *instance;
   }
 
-  // static void object_copied_response() {
-  //   throw std::runtime_error("Singleton already created");
-  // }
+ private:
+  template <typename Tuple1, typename Tuple2, std::size_t... I>
+  static bool compare_tuples(const Tuple1& lhs, const Tuple2& rhs,
+                             std::index_sequence<I...> /*unused*/) {
+    return ((std::get<I>(lhs) == std::get<I>(rhs)) && ...);
+  }
 
-  static void object_destroyed_response() {
-    delete instance;
-    instance = nullptr;
-    stored_args = {};
+  template <typename Tuple1, typename Tuple2>
+  static bool args_match(const Tuple1& lhs, const Tuple2& rhs) {
+    const std::size_t kSize1 = std::tuple_size_v<Tuple1>;
+    const std::size_t kSize2 = std::tuple_size_v<Tuple2>;
+
+    if (kSize1 != kSize2) {
+      return false;
+    }
+
+    return compare_tuples(lhs, rhs, std::make_index_sequence<kSize1>{});
   }
 };
 
 template <typename ArrayType>
 struct CountedCreation {
+ private:
   static inline std::size_t count{0};
 
+ public:
   template <typename... Args>
   static ArrayType create(Args&&... args) {
     ++count;
@@ -83,24 +102,23 @@ struct CountedCreation {
 
   CountedCreation() = default;
 
-  CountedCreation(CountedCreation& other) {
+  CountedCreation(const CountedCreation& other) {
     if (this != &other) {
       ++count;
     }
   }
 
-  CountedCreation& operator=(CountedCreation& other) {
+  CountedCreation& operator=(const CountedCreation& other) {
     if (this != &other) {
       ++count;
     }
     return *this;
   }
 
-  static void object_destroyed_response() {
-    if (count == 0) {
-      throw std::runtime_error("All objects allready destroyed");
+  ~CountedCreation() {
+    if (count > 0) {
+      --count;
     }
-    --count;
   }
 
   static std::size_t get_created_count() { return count; }
@@ -143,13 +161,10 @@ MemoryResource* SetDefaultResource(MemoryResource* resource) {
 
 namespace details {
 
-// TODO : DataHolder
 template <typename T, std::size_t Extent>
 class DataHolder {
  protected:
   alignas(T) std::byte buffer_[Extent * sizeof(T)];
-
-  // using ArrayType = ::Array<T, Extent, Creation>;
 
  public:
   std::size_t size() const { return Extent; }
@@ -163,7 +178,6 @@ class DataHolder {
     if (this != &other) {
       std::uninitialized_copy(other.data(), other.data() + other.size(),
                               data());
-      // Creation<DataHolder>::object_copied_response();
     }
   }
 
@@ -171,7 +185,6 @@ class DataHolder {
     if (this != &other) {
       std::uninitialized_copy(other.data(), other.data() + other.size(),
                               data());
-      // Creation<DataHolder>::object_copied_response();
     }
     return *this;
   }
@@ -184,8 +197,6 @@ class DataHolder<T, kDynamicExtent> {
   std::size_t size_;
   std::size_t capacity_;
   memres::MemoryResource* resource_;
-
-  // using ArrayType = ::Array<T, kDynamicExtent, Creation>;
 
  public:
   std::size_t size() const { return size_; }
@@ -204,7 +215,6 @@ class DataHolder<T, kDynamicExtent> {
           other.resource_->allocate(capacity_ * sizeof(T)));
       std::uninitialized_copy(other.data(), other.data() + other.size(),
                               data());
-      //Creation<DataHolder>::object_copied_response();
     }
   }
 
@@ -223,8 +233,6 @@ class DataHolder<T, kDynamicExtent> {
       buffer_ = memory;
       size_ = other.size_;
       capacity_ = other.capacity_;
-
-      //Creation<DataHolder>::object_copied_response();
     }
     return *this;
   }
@@ -233,8 +241,6 @@ class DataHolder<T, kDynamicExtent> {
 template <typename T>
 class DataHolder<T, 0> {
  protected:
-  // using ArrayType = ::Array<T, 0, Creation>;
-
  public:
   std::size_t size() const { return 0; }
 
@@ -242,19 +248,12 @@ class DataHolder<T, 0> {
   const T* data() const { return nullptr; }
 
   DataHolder() = default;
-
-  DataHolder(const DataHolder& /*unused*/) {
-    //Creation<DataHolder>::object_copied_response();
-  }
-  DataHolder& operator=(const DataHolder& /*unused*/) {
-   //Creation<DataHolder>::object_copied_response();
-    return nullptr;
-  }
+  DataHolder(const DataHolder& /*unused*/) = default;
+  DataHolder& operator=(const DataHolder& /*unused*/) = default;
 };
 
 template <typename T, std::size_t Extent>
 class ArrayBase : public DataHolder<T, Extent> {
-  // TODO : ArrayBase
  public:
   using iterator = T*;
   using const_iterator = const T*;
@@ -325,18 +324,17 @@ template <typename T, std::size_t Extent,
           template <typename> typename Creation = strategy::DefaultCreation>
 class Array : public details::ArrayBase<T, Extent>,
               public Creation<Array<T, Extent, Creation>> {
-  // TODO : Array
  public:
-  ~Array() { Creation<Array>::object_destroyed_response(); }
+  ~Array() = default;
 
   template <typename... Args>
-  static Array create(Args&&... args) {
-    std::initializer_list<T> init_list = {std::forward<Args>(args)...};
+  static decltype(auto) create(Args&&... args) {
+    std::list<T> init_list = {std::forward<Args>(args)...};
     return Creation<Array>::create(init_list);
   }
 
  private:
-  Array(std::initializer_list<T> init_list) {
+  Array(std::list<T> init_list) {
     std::uninitialized_copy(init_list.begin(), init_list.end(), this->begin());
   }
 
@@ -347,15 +345,13 @@ template <typename T, template <typename> typename Creation>
 class Array<T, kDynamicExtent, Creation>
     : public details::ArrayBase<T, kDynamicExtent>,
       public Creation<Array<T, kDynamicExtent, Creation>> {
-  // TODO : Vector
  public:
   template <typename... Args>
-  static Array create(Args&&... args) {
+  static decltype(auto) create(Args&&... args) {
     return Creation<Array>::create(std::forward<Args>(args)...);
   }
 
   ~Array() {
-    Creation<Array>::object_destroyed_response();
     this->clear();
     this->resource_->deallocate(reinterpret_cast<void*>(this->buffer_));
     this->buffer_ = nullptr;
@@ -460,6 +456,7 @@ class Array<T, kDynamicExtent, Creation>
       this->capacity_ = new_capacity;
     }
   }
+
   void shrink_to_fit() {
     if (!this->size_) {
       this->capacity_ = 0;
@@ -509,44 +506,73 @@ class Array<T, kDynamicExtent, Creation>
 };
 
 namespace traits {
-// TODO : Edit traits
 
-// template <typename T>
-// std::size_t GetSize(T) {
-//   return 0;
-// }
+template <typename T>
+std::size_t GetSize(const T& /*unused*/) {
+  return 0;
+}
 
-// template <typename T>
-// std::size_t GetRank(T) {
-//   return 0;
-// }
+template <typename T, std::size_t Extent, template <typename> typename Creation>
+std::size_t GetSize(const Array<T, Extent, Creation>& array) {
+  return array.size();
+}
 
-// template <typename T, std::size_t N>
-// std::size_t GetRank(const T (&array)[N]) {
-//   std::size_t rank = 0;
-//   if (GetSize(array) == 0) {
-//     return rank;
-//   }
-//   rank = 1 + GetRank(array[0]);
-//   return rank;
-// }
+template <typename T>
+struct RankHolder {
+  static inline std::size_t value{0};
+};
 
-// template <typename T>
-// std::size_t GetTotalElements(T) {
-//   return 1;
-// }
+template <typename T, std::size_t Extent, template <typename> typename Creation>
+struct RankHolder<Array<T, Extent, Creation>> {
+  static inline std::size_t value{1 + RankHolder<T>::value};
+};
 
-// template <typename T, std::size_t N>
-// std::size_t GetTotalElements(const T (&array)[N]) {
-//   std::size_t num_elem = 1;
-//   num_elem *= (GetSize(array) * GetTotalElements(array[0]));
-//   return num_elem;
-// }
+template <typename T>
+std::size_t GetRank(const T& /*unused*/) {
+  return RankHolder<T>::value;
+}
 
-// TODO : GetExtent
-// template <typename I>
-// std::size_t GetExtent(Array array) {
-//   return 0;
-// }
+template <typename T>
+std::size_t GetTotalElements(const T& /*unused*/) {
+  return 1;
+}
+
+template <typename T, std::size_t Extent, template <typename> typename Creation>
+std::size_t GetTotalElements(const Array<T, Extent, Creation>& array) {
+  if (Extent == kDynamicExtent) {
+    return kDynamicExtent;
+  }
+  std::size_t num_elem = 1;
+  std::size_t current_level_size = GetSize(array);
+  if (current_level_size == 0) {
+    return 1;
+  }
+  std::size_t elements_deeper_count = GetTotalElements(array[0]);
+  if (elements_deeper_count == kDynamicExtent) {
+    return kDynamicExtent;
+  }
+  num_elem *= (current_level_size * elements_deeper_count);
+  return num_elem;
+}
+
+template <std::size_t I, typename T>
+struct ExtentHolder;
+
+template <typename T, std::size_t Extent, template <typename> typename Creation>
+struct ExtentHolder<0, Array<T, Extent, Creation>> {
+  static inline std::size_t value{Extent};
+};
+
+template <std::size_t I, typename T, std::size_t Extent,
+          template <typename> typename Creation>
+struct ExtentHolder<I, Array<T, Extent, Creation>> {
+  static inline std::size_t value{ExtentHolder<I - 1, T>::value};
+};
+
+template <std::size_t I, typename T, std::size_t Extent,
+          template <typename> typename Creation>
+constexpr std::size_t GetExtent(const Array<T, Extent, Creation>& /*unused*/) {
+  return ExtentHolder<I, Array<T, Extent, Creation>>::value;
+}
 
 }  // namespace traits
