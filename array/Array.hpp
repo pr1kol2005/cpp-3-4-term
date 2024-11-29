@@ -513,8 +513,8 @@ std::size_t GetSize(const T& /*unused*/) {
 }
 
 template <typename T, std::size_t Extent, template <typename> typename Creation>
-std::size_t GetSize(const Array<T, Extent, Creation>& array_variable) {
-  return array_variable.size();
+std::size_t GetSize(const Array<T, Extent, Creation>& aray) {
+  return aray.size();
 }
 
 template <typename T>
@@ -538,16 +538,16 @@ std::size_t GetTotalElements(const T& /*unused*/) {
 }
 
 template <typename T, std::size_t Extent, template <typename> typename Creation>
-std::size_t GetTotalElements(const Array<T, Extent, Creation>& array_variable) {
+std::size_t GetTotalElements(const Array<T, Extent, Creation>& aray) {
   if (Extent == kDynamicExtent) {
     return kDynamicExtent;
   }
   std::size_t num_elem = 1;
-  std::size_t current_level_size = GetSize(array_variable);
+  std::size_t current_level_size = GetSize(aray);
   if (current_level_size == 0) {
     return 1;
   }
-  std::size_t elements_deeper_count = GetTotalElements(array_variable[0]);
+  std::size_t elements_deeper_count = GetTotalElements(aray[0]);
   if (elements_deeper_count == kDynamicExtent) {
     return kDynamicExtent;
   }
