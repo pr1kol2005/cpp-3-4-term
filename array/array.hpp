@@ -7,6 +7,7 @@
 #include <memory>
 #include <stdexcept>
 #include <tuple>
+#include <utility>
 
 inline constexpr std::size_t kDynamicExtent = static_cast<std::size_t>(-1);
 
