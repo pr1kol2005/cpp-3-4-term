@@ -24,15 +24,9 @@ struct DefaultCreation {
   ~DefaultCreation() = default;
 };
 
-template <typename Tuple, typename... Args, std::size_t... I>
-bool ArgsMatchHelp(const Tuple& saved_args,
-                   const std::tuple<Args...>& new_args) {
-  return ((std::get<I>(saved_args) == std::get<I>(new_args)) && ...);
-}
-
 template <typename Tuple, typename... Args>
 bool ArgsMatch(const Tuple& saved_args, const Args&... args) {
-  return ArgsMatchHelp(saved_args, std::make_tuple(args...));
+  return saved_args == std::make_tuple(args...);
 }
 
 template <typename ArrayType>
@@ -152,9 +146,7 @@ MemoryResource* default_resource = new NewDeleteResource();
 MemoryResource* GetDefaultResource() { return default_resource; }
 
 MemoryResource* SetDefaultResource(MemoryResource* resource) {
-  MemoryResource* old_resource = default_resource;
-  default_resource = resource;
-  return old_resource;
+  return std::exchange(default_resource, resource);
 }
 
 }  // namespace memres
@@ -394,58 +386,8 @@ class Array<T, kDynamicExtent, Creation>
 
   std::size_t capacity() const { return this->capacity_; }
 
-  void resize(std::size_t new_size) {
-    if (new_size > this->size_) {
-      if (new_size <= this->capacity_) {
-        std::uninitialized_default_construct(this->end(),
-                                             this->begin() + new_size);
-        this->size_ = new_size;
-      } else {
-        std::byte* memory = reinterpret_cast<std::byte*>(
-            this->resource_->allocate(new_size * sizeof(T)));
-        auto new_begin = reinterpret_cast<T*>(memory);
-        std::uninitialized_default_construct(new_begin + this->size_,
-                                             new_begin + new_size);
-        std::uninitialized_move(this->begin(), this->end(), new_begin);
-        std::destroy(this->begin(), this->end());
-        this->resource_->deallocate(reinterpret_cast<void*>(this->buffer_));
-        this->buffer_ = memory;
-        this->capacity_ = new_size;
-        this->size_ = new_size;
-      }
-    } else {
-      std::destroy(this->begin() + new_size, this->begin() + this->size_);
-      this->size_ = new_size;
-    }
-  }
-
-  void resize(std::size_t new_size, const T& value) {
-    if (new_size > this->size_) {
-      if (new_size <= this->capacity_) {
-        std::uninitialized_default_construct(this->end(),
-                                             this->begin() + new_size);
-        this->size_ = new_size;
-      } else {
-        std::byte* memory = reinterpret_cast<std::byte*>(
-            this->resource_->allocate(new_size * sizeof(T)));
-        auto new_begin = reinterpret_cast<T*>(memory);
-        std::uninitialized_fill(new_begin + this->size_, new_begin + new_size,
-                                value);
-        std::uninitialized_move(this->begin(), this->end(), new_begin);
-        std::destroy(this->begin(), this->end());
-        this->resource_->deallocate(reinterpret_cast<void*>(this->buffer_));
-        this->buffer_ = memory;
-        this->capacity_ = new_size;
-        this->size_ = new_size;
-      }
-    } else {
-      std::destroy(this->begin() + new_size, this->begin() + this->size_);
-      this->size_ = new_size;
-    }
-  }
-
   void reserve(std::size_t new_capacity) {
-    if (new_capacity > this->capacity_) {
+    if (this->capacity_ < new_capacity) {
       std::byte* memory = reinterpret_cast<std::byte*>(
           this->resource_->allocate(new_capacity * sizeof(T)));
       auto new_begin = reinterpret_cast<T*>(memory);
@@ -454,6 +396,24 @@ class Array<T, kDynamicExtent, Creation>
       this->resource_->deallocate(reinterpret_cast<void*>(this->buffer_));
       this->buffer_ = memory;
       this->capacity_ = new_capacity;
+    }
+  }
+
+  void resize(std::size_t new_size, const T& value = T()) {
+    if (new_size > this->size_) {
+      if (new_size <= this->capacity_) {
+        std::uninitialized_default_construct(this->end(),
+                                             this->begin() + new_size);
+        this->size_ = new_size;
+      } else {
+        reserve(new_size);
+        std::uninitialized_fill(this->begin() + this->size_,
+                                this->begin() + new_size, value);
+        this->size_ = new_size;
+      }
+    } else {
+      std::destroy(this->begin() + new_size, this->begin() + this->size_);
+      this->size_ = new_size;
     }
   }
 
