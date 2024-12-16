@@ -109,8 +109,7 @@ class List {
     std::swap(tail_, temp.tail_);
     std::swap(size_, temp.size_);
 
-    if (std::allocator_traits<
-            node_allocator>::propagate_on_container_copy_assignment::value &&
+    if (node_allocator_traits::propagate_on_container_copy_assignment::value &&
         node_allocator_ != other.node_allocator_) {
       node_allocator_ = other.node_allocator_;
     }
