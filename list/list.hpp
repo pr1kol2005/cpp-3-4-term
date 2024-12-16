@@ -99,15 +99,21 @@ class List {
       return *this;
     }
 
+    List temp(0, node_allocator_);
+
+    for (const T& value : other) {
+      temp.push_back(value);
+    }
+
+    std::swap(head_, temp.head_);
+    std::swap(tail_, temp.tail_);
+    std::swap(size_, temp.size_);
+
     if (std::allocator_traits<
             node_allocator>::propagate_on_container_copy_assignment::value) {
       node_allocator_ = other.node_allocator_;
     }
 
-    List temp(other);
-    std::swap(head_, temp.head_);
-    std::swap(tail_, temp.tail_);
-    std::swap(size_, temp.size_);
     return *this;
   }
 
