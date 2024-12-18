@@ -99,6 +99,14 @@ class List {
       return *this;
     }
 
+    if (node_allocator_traits::propagate_on_container_copy_assignment::value) {
+      node_allocator_ = other.node_allocator_;
+    } else if (!node_allocator_traits::is_always_equal::value) {
+      if (node_allocator_ != other.node_allocator_) {
+        node_allocator_ = other.node_allocator_;
+      }
+    }
+
     List temp(0, node_allocator_);
 
     for (const T& value : other) {
@@ -108,14 +116,6 @@ class List {
     std::swap(head_, temp.head_);
     std::swap(tail_, temp.tail_);
     std::swap(size_, temp.size_);
-
-    if (node_allocator_traits::propagate_on_container_copy_assignment::value) {
-      node_allocator_ = other.node_allocator_;
-    } else if (!node_allocator_traits::is_always_equal::value) {
-      if (node_allocator_ != other.node_allocator_) {
-        node_allocator_ = other.node_allocator_;
-      }
-    }
 
     return *this;
   }
