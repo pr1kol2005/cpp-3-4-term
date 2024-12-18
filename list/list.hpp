@@ -109,10 +109,12 @@ class List {
     std::swap(tail_, temp.tail_);
     std::swap(size_, temp.size_);
 
-    if (node_allocator_traits::propagate_on_container_copy_assignment::value) {
+    if (node_allocator_traits::propagate_on_container_copy_assignment::value == true) {
       node_allocator_ = other.node_allocator_;
-    } else if (node_allocator_ == other.node_allocator_) {
-      node_allocator_ = other.node_allocator_;
+    } else if (node_allocator_::is_always_equal::value == false) {
+      if (node_allocator_ != other.node_allocator_) {
+        node_allocator_ = other.node_allocator_;
+      }
     }
 
     return *this;
