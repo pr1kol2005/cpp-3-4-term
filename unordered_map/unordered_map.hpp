@@ -1,15 +1,11 @@
-// TODO Vizualization of allocation policy in copy/move assignment
-
 #pragma once
 
 #include <algorithm>
 #include <cmath>
-#include <initializer_list>
 #include <iostream>
 #include <iterator>
 #include <list>
 #include <memory>
-#include <stdexcept>
 #include <vector>
 
 template <class Key, class T, class Hash = std::hash<Key>,
@@ -36,7 +32,6 @@ class UnorderedMap {
   using const_pointer = allocator_traits::const_pointer;
   using iterator = value_list_type::iterator;
   using const_iterator = value_list_type::const_iterator;
-  using this_type = UnorderedMap<Key, T, Hash, Equal, Allocator>;
   using bucket_list_type = std::vector<Bucket>;
 
   // ANCHOR Constructors
