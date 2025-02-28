@@ -12,6 +12,9 @@ class BadWeakPtr : public std::runtime_error {
 template <class T>
 class WeakPtr;
 
+template <class T>
+class SharedPtr;
+
 struct Counter {
   size_t strong_count = 0;
   size_t weak_count = 0;
