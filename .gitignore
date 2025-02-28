@@ -2,3 +2,7 @@
 !big_integer/big_integer.
 !geometry/geometry.
 !matrix/matrix.
+!array/array.
+!list/list.
+!unordered_map/unordered_map.
+!smart_pointers/smart_pointers.
