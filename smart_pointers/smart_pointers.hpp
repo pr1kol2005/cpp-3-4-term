@@ -6,6 +6,85 @@ template <class T>
 class WeakPtr;
 
 template <class T>
+class SharedPtr;
+
+struct ControlBlock {
+  size_t strong_count = 1;
+  size_t weak_count = 0;
+
+  virtual void dispose() = 0;
+  virtual void destroy() = 0;
+  virtual ~ControlBlock() = default;
+};
+
+template <class Y, class Deleter = std::default_delete<Y>,
+          class Allocator = std::allocator<Y>>
+struct ControlBlockWithPtr : public ControlBlock {
+  using alloc_traits = std::allocator_traits<Allocator>;
+  using cb_alloc_type =
+      typename alloc_traits::template rebind_alloc<ControlBlockWithPtr>;
+  using cb_alloc_type_traits = std::allocator_traits<cb_alloc_type>;
+
+  Y* ptr;
+  Deleter del;
+  Allocator alloc;
+
+  ControlBlockWithPtr(Y* ptr, Deleter del = Deleter(),
+                      Allocator alloc = Allocator())
+      : ptr(ptr), del(del), alloc(alloc) {}
+
+  void dispose() override { del(ptr); }
+
+  static ControlBlockWithPtr* create(Y* pointer, Deleter deleter,
+                                     Allocator alloc) {
+    cb_alloc_type cb_alloc(alloc);
+    ControlBlockWithPtr* cb_ptr = cb_alloc_type_traits::allocate(cb_alloc, 1);
+    cb_alloc_type_traits::construct(cb_alloc, cb_ptr, pointer, deleter, alloc);
+    return cb_ptr;
+  }
+
+  void destroy() override {
+    cb_alloc_type cb_alloc(alloc);
+    cb_alloc_type_traits::destroy(cb_alloc, this);
+    cb_alloc_type_traits::deallocate(cb_alloc, this, 1);
+  }
+};
+
+template <class Y, class Allocator = std::allocator<Y>>
+struct ControlBlockWithObject : public ControlBlock {
+  using alloc_traits = std::allocator_traits<Allocator>;
+  using cb_alloc_type =
+      typename alloc_traits::template rebind_alloc<ControlBlockWithObject>;
+  using cb_alloc_type_traits = std::allocator_traits<cb_alloc_type>;
+  Y object;
+  Allocator alloc;
+
+  template <class... Args>
+  ControlBlockWithObject(Args&&... args)
+      : object{std::forward<Args>(args)...} {}
+
+  template <class... Args>
+  ControlBlockWithObject(Allocator alloc, Args&&... args)
+      : alloc(alloc), object{std::forward<Args>(args)...} {}
+
+  template <class... Args>
+  static ControlBlockWithObject* create(Allocator alloc, Args&&... args) {
+    cb_alloc_type cb_alloc(alloc);
+    ControlBlockWithObject* cb_ptr =
+        cb_alloc_type_traits::allocate(cb_alloc, 1);
+    cb_alloc_type_traits::construct(cb_alloc, cb_ptr, alloc,
+                                    std::forward<Args>(args)...);
+    return cb_ptr;
+  }
+
+  void dispose() override { alloc_traits::destroy(alloc, &object); }
+  void destroy() override {
+    cb_alloc_type cb_alloc(alloc);
+    cb_alloc_type_traits::deallocate(cb_alloc, this, 1);
+  }
+};
+
+template <class T>
 class SharedPtr {
  public:
   SharedPtr() : ptr_(nullptr), counter_(nullptr) {}
@@ -30,7 +109,7 @@ class SharedPtr {
   template <class Y>
   SharedPtr(const SharedPtr<Y>& other) noexcept
       : ptr_(static_cast<T*>(other.ptr_)),
-        counter_(reinterpret_cast<ControlBlock*>(other.counter_)) {
+        counter_(const_cast<ControlBlock*>(other.counter_)) {
     if (counter_) {
       counter_->strong_count++;
     }
@@ -41,7 +120,7 @@ class SharedPtr {
     if (this != reinterpret_cast<const SharedPtr*>(&other)) {
       reset();
       ptr_ = static_cast<T*>(other.ptr_);
-      counter_ = reinterpret_cast<ControlBlock*>(other.counter_);
+      counter_ = const_cast<ControlBlock*>(other.counter_);
       if (counter_) {
         counter_->strong_count++;
       }
@@ -133,7 +212,6 @@ class SharedPtr {
   friend SharedPtr<Y> AllocateShared(Allocator alloc, Args&&... args);
 
  private:
-  struct ControlBlock;
   friend class WeakPtr<T>;
   template <class>
   friend class SharedPtr;
@@ -142,83 +220,6 @@ class SharedPtr {
   T* ptr_;
   ControlBlock* counter_;
 
-  struct ControlBlock {
-    size_t strong_count = 1;
-    size_t weak_count = 0;
-
-    virtual void dispose() = 0;
-    virtual void destroy() = 0;
-    virtual ~ControlBlock() = default;
-  };
-
-  template <class Y, class Deleter = std::default_delete<Y>,
-            class Allocator = std::allocator<Y>>
-  struct ControlBlockWithPtr : public ControlBlock {
-    using alloc_traits = std::allocator_traits<Allocator>;
-    using cb_alloc_type =
-        typename alloc_traits::template rebind_alloc<ControlBlockWithPtr>;
-    using cb_alloc_type_traits = std::allocator_traits<cb_alloc_type>;
-
-    Y* ptr;
-    Deleter del;
-    Allocator alloc;
-
-    ControlBlockWithPtr(Y* ptr, Deleter del = Deleter(),
-                        Allocator alloc = Allocator())
-        : ptr(ptr), del(del), alloc(alloc) {}
-
-    void dispose() override { del(ptr); }
-
-    static ControlBlockWithPtr* create(Y* pointer, Deleter deleter,
-                                       Allocator alloc) {
-      cb_alloc_type cb_alloc(alloc);
-      ControlBlockWithPtr* cb_ptr = cb_alloc_type_traits::allocate(cb_alloc, 1);
-      cb_alloc_type_traits::construct(cb_alloc, cb_ptr, pointer, deleter,
-                                      alloc);
-      return cb_ptr;
-    }
-
-    void destroy() override {
-      cb_alloc_type cb_alloc(alloc);
-      cb_alloc_type_traits::destroy(cb_alloc, this);
-      cb_alloc_type_traits::deallocate(cb_alloc, this, 1);
-    }
-  };
-
-  template <class Y, class Allocator = std::allocator<Y>>
-  struct ControlBlockWithObject : public ControlBlock {
-    using alloc_traits = std::allocator_traits<Allocator>;
-    using cb_alloc_type =
-        typename alloc_traits::template rebind_alloc<ControlBlockWithObject>;
-    using cb_alloc_type_traits = std::allocator_traits<cb_alloc_type>;
-    Y object;
-    Allocator alloc;
-
-    template <class... Args>
-    ControlBlockWithObject(Args&&... args)
-        : object{std::forward<Args>(args)...} {}
-
-    template <class... Args>
-    ControlBlockWithObject(Allocator alloc, Args&&... args)
-        : alloc(alloc), object{std::forward<Args>(args)...} {}
-
-    template <class... Args>
-    static ControlBlockWithObject* create(Allocator alloc, Args&&... args) {
-      cb_alloc_type cb_alloc(alloc);
-      ControlBlockWithObject* cb_ptr =
-          cb_alloc_type_traits::allocate(cb_alloc, 1);
-      cb_alloc_type_traits::construct(cb_alloc, cb_ptr, alloc,
-                                      std::forward<Args>(args)...);
-      return cb_ptr;
-    }
-
-    void dispose() override { alloc_traits::destroy(alloc, &object); }
-    void destroy() override {
-      cb_alloc_type cb_alloc(alloc);
-      cb_alloc_type_traits::deallocate(cb_alloc, this, 1);
-    }
-  };
-
   template <class Y, class Allocator = std::allocator<Y>>
   explicit SharedPtr(ControlBlockWithObject<Y, Allocator>* cb_ptr)
       : ptr_(&cb_ptr->object), counter_(cb_ptr) {}
@@ -226,17 +227,15 @@ class SharedPtr {
 
 template <class T, class... Args>
 SharedPtr<T> MakeShared(Args&&... args) {
-  auto* cb_ptr = new SharedPtr<T>::template ControlBlockWithObject<T>(
-      std::forward<Args>(args)...);
+  auto* cb_ptr = new ControlBlockWithObject<T>(std::forward<Args>(args)...);
   return SharedPtr<T>(cb_ptr);
 }
 
 template <class T, class... Args, class Allocator>
 SharedPtr<T> AllocateShared(Allocator alloc, Args&&... args) {
   // TODO implement AllocateShared
-  auto* cb_ptr =
-      SharedPtr<T>::template ControlBlockWithObject<T, Allocator>::create(
-          alloc, std::forward<Args>(args)...);
+  auto* cb_ptr = ControlBlockWithObject<T, Allocator>::create(
+      alloc, std::forward<Args>(args)...);
   return SharedPtr<T>(cb_ptr);
 }
 
@@ -323,5 +322,5 @@ class WeakPtr {
   friend class SharedPtr<T>;
 
   T* ptr_;
-  SharedPtr<T>::ControlBlock* counter_;
+  ControlBlock* counter_;
 };
