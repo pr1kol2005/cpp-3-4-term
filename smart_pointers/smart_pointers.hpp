@@ -29,7 +29,7 @@ class SharedPtr {
 
   template <class Y>
   SharedPtr(const SharedPtr<Y>& other) noexcept
-      : ptr_(other.ptr_),
+      : ptr_(static_cast<T*>(other.ptr_)),
         counter_(reinterpret_cast<ControlBlock*>(other.counter_)) {
     if (counter_) {
       counter_->strong_count++;
@@ -40,7 +40,7 @@ class SharedPtr {
   SharedPtr& operator=(const SharedPtr<Y>& other) noexcept {
     if (this != reinterpret_cast<const SharedPtr*>(&other)) {
       reset();
-      ptr_ = other.ptr_;
+      ptr_ = static_cast<T*>(other.ptr_);
       counter_ = reinterpret_cast<ControlBlock*>(other.counter_);
       if (counter_) {
         counter_->strong_count++;
