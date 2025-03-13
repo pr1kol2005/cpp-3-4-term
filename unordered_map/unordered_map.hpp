@@ -32,18 +32,16 @@ class UnorderedMap {
   using const_pointer = allocator_traits::const_pointer;
   using iterator = value_list_type::iterator;
   using const_iterator = value_list_type::const_iterator;
-  using bucket_list_type = std::vector<Bucket>;
+  using bucket_vector_type = std::vector<Bucket>;
 
   // ANCHOR Constructors
   UnorderedMap() : max_load_factor_(1.0) { reserve(kDefaultBucketCount); }
 
   UnorderedMap(const UnorderedMap& other)
-      : max_load_factor_(other.max_load_factor_) {
-    reserve(other.size());
+      : max_load_factor_(other.max_load_factor_),
+        value_list_(other.value_list_) {
     try {
-      for (const auto& elem : other) {
-        insert(elem);
-      }
+      rehash(size());
     } catch (...) {
       clear();
       throw;
@@ -60,8 +58,14 @@ class UnorderedMap {
   // ANCHOR Assignment
   UnorderedMap& operator=(const UnorderedMap& other) {
     if (this != &other) {
-      UnorderedMap temp(other);
-      swap(temp);
+      max_load_factor_ = other.max_load_factor_;
+      value_list_ = other.value_list_;
+      try {
+        rehash(size());
+      } catch (...) {
+        clear();
+        throw;
+      }
     }
     return *this;
   }
@@ -157,7 +161,7 @@ class UnorderedMap {
   std::pair<iterator, bool> emplace(Args&&... args) {
     rehash_if_necessary();
 
-    allocator_type alloc = Allocator();
+    allocator_type alloc = value_list_.get_allocator();
     pointer emplaced_ptr = allocator_traits::allocate(alloc, 1);
 
     try {
@@ -287,7 +291,7 @@ class UnorderedMap {
 
   void rehash(size_type new_bucket_count) {
     new_bucket_count = get_new_bucket_count(new_bucket_count);
-    bucket_list_type new_buckets(new_bucket_count, {value_list_.end(), 0});
+    bucket_vector_type new_buckets(new_bucket_count, {value_list_.end(), 0});
 
     for (auto it = value_list_.begin(); it != value_list_.end(); ++it) {
       size_type new_hash = get_hash(it->first, new_bucket_count);
@@ -308,11 +312,12 @@ class UnorderedMap {
     }
   }
 
+  // ANCHOR Private fields
  private:
-  static constexpr size_type kDefaultBucketCount{8};
+  static const size_type kDefaultBucketCount{8};
   float max_load_factor_;
   value_list_type value_list_;
-  bucket_list_type bucket_vector_;
+  bucket_vector_type bucket_vector_;
 
   struct Bucket {
     size_type size;
