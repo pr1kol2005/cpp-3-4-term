@@ -1,6 +1,6 @@
 #pragma once
 
-#include <yaml-cpp/yaml.h>
+// #include <yaml-cpp/yaml.h>
 
 #include <fstream>
 #include <memory>
@@ -226,24 +226,24 @@ class Configurator {
     }
   }
 
-  void Init(const std::string& filename) {
-    std::map<std::string, std::string> conf_values;
+  // void Init(const std::string& filename) {
+  //   std::map<std::string, std::string> conf_values;
 
-    try {
-      YAML::Node config = YAML::LoadFile(filename);
+  //   try {
+  //     YAML::Node config = YAML::LoadFile(filename);
 
-      for (const auto& entry : config) {
-        std::string key = entry.first.as<std::string>();
-        std::string value = entry.second.as<std::string>();
-        conf_values[key] = value;
-      }
-    } catch (const YAML::Exception& e) {
-      throw std::runtime_error("Failed to parse YAML file: " +
-                               std::string(e.what()));
-    }
+  //     for (const auto& entry : config) {
+  //       std::string key = entry.first.as<std::string>();
+  //       std::string value = entry.second.as<std::string>();
+  //       conf_values[key] = value;
+  //     }
+  //   } catch (const YAML::Exception& exception) {
+  //     throw std::runtime_error("Failed to parse YAML file: " +
+  //                              std::string(exception.what()));
+  //   }
 
-    Init(conf_values);
-  }
+  //   Init(conf_values);
+  // }
 
   void Drop(const std::string& name) {
     auto it = AccessSetting(name);
