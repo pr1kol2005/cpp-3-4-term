@@ -15,6 +15,26 @@ struct ControlBlock {
   virtual void dispose() = 0;
   virtual void destroy() = 0;
   virtual ~ControlBlock() = default;
+
+  void increase_strong_count() { ++strong_count; }
+  void decrease_strong_count() {
+    --strong_count;
+    if (strong_count == 0) {
+      dispose();
+
+      if (weak_count == 0) {
+        destroy();
+      }
+    }
+  }
+
+  void increase_weak_count() { ++weak_count; }
+  void decrease_weak_count() {
+    --weak_count;
+    if (strong_count == 0 && weak_count == 0) {
+      destroy();
+    }
+  }
 };
 
 template <class Y, class Deleter = std::default_delete<Y>,
@@ -26,8 +46,8 @@ struct ControlBlockWithPtr : public ControlBlock {
   using cb_alloc_type_traits = std::allocator_traits<cb_alloc_type>;
 
   Y* ptr;
-  Deleter del;
-  Allocator alloc;
+  [[no_unique_address]] Deleter del;
+  [[no_unique_address]] Allocator alloc;
 
   ControlBlockWithPtr(Y* ptr, Deleter del = Deleter(),
                       Allocator alloc = Allocator())
@@ -35,8 +55,8 @@ struct ControlBlockWithPtr : public ControlBlock {
 
   void dispose() override { del(ptr); }
 
-  static ControlBlockWithPtr* create(Y* pointer, Deleter deleter,
-                                     Allocator alloc) {
+  static ControlBlockWithPtr* create(Y* pointer, Deleter deleter = Deleter(),
+                                     Allocator alloc = Allocator()) {
     cb_alloc_type cb_alloc(alloc);
     ControlBlockWithPtr* cb_ptr = cb_alloc_type_traits::allocate(cb_alloc, 1);
     cb_alloc_type_traits::construct(cb_alloc, cb_ptr, pointer, deleter, alloc);
@@ -57,7 +77,7 @@ struct ControlBlockWithObject : public ControlBlock {
       typename alloc_traits::template rebind_alloc<ControlBlockWithObject>;
   using cb_alloc_type_traits = std::allocator_traits<cb_alloc_type>;
   Y object;
-  Allocator alloc;
+  [[no_unique_address]] Allocator alloc;
 
   template <class... Args>
   ControlBlockWithObject(Args&&... args)
@@ -91,27 +111,19 @@ class SharedPtr {
 
   SharedPtr(std::nullptr_t) : ptr_(nullptr), counter_(nullptr) {}
 
-  template <class Y>
-  explicit SharedPtr(Y* pointer)
-      : ptr_(pointer), counter_(new ControlBlockWithPtr<Y>(pointer)) {}
-
-  template <class Y, class Deleter>
-  SharedPtr(Y* pointer, Deleter deleter)
-      : ptr_(pointer),
-        counter_(new ControlBlockWithPtr<Y, Deleter>(pointer, deleter)) {}
-
-  template <class Y, class Deleter, class Allocator>
-  SharedPtr(Y* pointer, Deleter deleter, Allocator alloc)
+  template <class Y, class Deleter = std::default_delete<Y>,
+            class Allocator = std::allocator<Y>>
+  SharedPtr(Y* pointer, Deleter deleter = Deleter(),
+            Allocator alloc = Allocator())
       : ptr_(pointer),
         counter_(ControlBlockWithPtr<Y, Deleter, Allocator>::create(
             pointer, deleter, alloc)) {}
 
   template <class Y>
   SharedPtr(const SharedPtr<Y>& other) noexcept
-      : ptr_(static_cast<T*>(other.ptr_)),
-        counter_(const_cast<ControlBlock*>(other.counter_)) {
+      : ptr_(static_cast<T*>(other.ptr_)), counter_((other.counter_)) {
     if (counter_) {
-      counter_->strong_count++;
+      counter_->increase_strong_count();
     }
   }
 
@@ -120,9 +132,9 @@ class SharedPtr {
     if (this != reinterpret_cast<const SharedPtr*>(&other)) {
       reset();
       ptr_ = static_cast<T*>(other.ptr_);
-      counter_ = const_cast<ControlBlock*>(other.counter_);
+      counter_ = (other.counter_);
       if (counter_) {
-        counter_->strong_count++;
+        counter_->increase_strong_count();
       }
     }
     return *this;
@@ -132,14 +144,14 @@ class SharedPtr {
     ptr_ = other.ptr_;
     counter_ = other.counter_;
     if (counter_ != nullptr) {
-      counter_->strong_count++;
+      counter_->increase_strong_count();
     }
   }
 
   SharedPtr(const SharedPtr& other)
       : ptr_(other.ptr_), counter_(other.counter_) {
     if (counter_ != nullptr) {
-      counter_->strong_count++;
+      counter_->increase_strong_count();
     }
   }
 
@@ -149,7 +161,7 @@ class SharedPtr {
       ptr_ = other.ptr_;
       counter_ = other.counter_;
       if (counter_ != nullptr) {
-        counter_->strong_count++;
+        counter_->increase_strong_count();
       }
     }
     return *this;
@@ -171,17 +183,10 @@ class SharedPtr {
 
   void reset(T* pointer = nullptr) {
     if (counter_ != nullptr) {
-      --counter_->strong_count;
-      if (counter_->strong_count == 0) {
-        counter_->dispose();
-
-        if (counter_->weak_count == 0) {
-          counter_->destroy();
-        }
-      }
+      counter_->decrease_strong_count();
     }
     ptr_ = pointer;
-    counter_ = pointer ? new ControlBlockWithPtr<T>(pointer) : nullptr;
+    counter_ = pointer ? ControlBlockWithPtr<T>::create(pointer) : nullptr;
   }
 
   void swap(SharedPtr& other) {
@@ -216,7 +221,6 @@ class SharedPtr {
   template <class>
   friend class SharedPtr;
 
-  // TODO : inheritance support
   T* ptr_;
   ControlBlock* counter_;
 
@@ -233,7 +237,6 @@ SharedPtr<T> MakeShared(Args&&... args) {
 
 template <class T, class... Args, class Allocator>
 SharedPtr<T> AllocateShared(Allocator alloc, Args&&... args) {
-  // TODO implement AllocateShared
   auto* cb_ptr = ControlBlockWithObject<T, Allocator>::create(
       alloc, std::forward<Args>(args)...);
   return SharedPtr<T>(cb_ptr);
@@ -250,7 +253,7 @@ class WeakPtr {
     ptr_ = other.ptr_;
     counter_ = other.counter_;
     if (counter_ != nullptr) {
-      counter_->weak_count++;
+      counter_->increase_weak_count();
     }
   }
 
@@ -258,7 +261,7 @@ class WeakPtr {
     ptr_ = other.ptr_;
     counter_ = other.counter_;
     if (counter_ != nullptr) {
-      counter_->weak_count++;
+      counter_->increase_weak_count();
     }
   }
 
@@ -268,7 +271,7 @@ class WeakPtr {
       ptr_ = other.ptr_;
       counter_ = other.counter_;
       if (counter_ != nullptr) {
-        counter_->weak_count++;
+        counter_->increase_weak_count();
       }
     }
     return *this;
@@ -290,10 +293,7 @@ class WeakPtr {
 
   void reset() {
     if (counter_ != nullptr) {
-      counter_->weak_count--;
-      if (counter_->strong_count == 0 && counter_->weak_count == 0) {
-        counter_->destroy();
-      }
+      counter_->decrease_weak_count();
     }
     ptr_ = nullptr;
     counter_ = nullptr;
