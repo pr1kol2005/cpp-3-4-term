@@ -1,148 +1,150 @@
-#include <algorithm>
-#include <cmath>
-#include <iostream>
-#include <queue>
-#include <unordered_set>
-#include <vector>
+#pragma once
 
-template <typename T>
-using Matrix = std::vector<std::vector<T>>;
+#include <array>
 
-template <typename T>
-using PriorityQueue = std::priority_queue<T, std::vector<T>, std::greater<T>>;
+constexpr int kBoardSize = 3;
+constexpr int kFlatBoardSize = kBoardSize * kBoardSize;
+constexpr int kDirecions[4] = {+1, -1, +3, -3};
 
-using StrUnorderedSet = std::unordered_set<std::string>;
-
-using PairVector = std::vector<std::pair<int, int>>;
-
-struct Puzzle {
-  Matrix<int> board;
-  int x;     // x coordinate of empty cell
-  int y;     // y coordinate of empty cell
-  int dist;  // sum of Manhattan distances
-  std::string path;
-
-  Puzzle(Matrix<int> b, int xx, int yy, int d, std::string p)
-      : board(b), x(xx), y(yy), dist(d), path(p) {}
-
-
-  bool operator>(const Puzzle& other) const {
-    return (path.size() + dist) > (other.path.size() + other.dist);
-  }
-};
-
-const int kBoardSize = 3;
-const int kDirectionsNumber = 4;
-const Matrix<int> kGoal = {{1, 2, 3}, {4, 5, 6}, {7, 8, 0}};
-const PairVector kDirections = {{0, 1}, {0, -1}, {1, 0}, {-1, 0}};
-const std::string kDirectionsLetters = "RLDU";
-const std::string kEmptyString = "";
-
-Matrix<int> InputBoard() {
-  Matrix<int> board(kBoardSize, std::vector<int>(kBoardSize, 0));
-  for (int i = 0; i < kBoardSize; ++i) {
-    for (int j = 0; j < kBoardSize; ++j) {
-      std::cin >> board[i][j];
+constexpr bool IsValid(const std::array<int, kFlatBoardSize> &board) {
+  bool seen[kFlatBoardSize] = {};
+  for (int x : board) {
+    if (x < 0 || x >= kFlatBoardSize) {
+      return false;
     }
+    if (seen[x]) {
+      return false;
+    }
+    seen[x] = true;
   }
-  return board;
+  return true;
 }
 
-int CalculateDist(const Matrix<int>& board) {
-  int dist = 0;
-  for (int i = 0; i < kBoardSize; ++i) {
-    for (int j = 0; j < kBoardSize; ++j) {
-      if (board[i][j] == 0) {
-        continue;
-      }
-      int target_x = (board[i][j] - 1) / kBoardSize;
-      int target_y = (board[i][j] - 1) % kBoardSize;
-      dist += std::abs(i - target_x) + std::abs(j - target_y);
+constexpr bool IsSolvable(const std::array<int, kFlatBoardSize> &board) {
+  int inversions_count = 0;
+  for (int i = 0; i < kFlatBoardSize; ++i) {
+    if (board[i] == 0) {
+      continue;
     }
+    for (int j = i + 1; j < kFlatBoardSize; ++j) {
+      if (board[j] != 0 && board[i] > board[j]) {
+        ++inversions_count;
+      }
+    }
+  }
+  return (inversions_count % 2) == 0;
+}
+
+constexpr int Absolute(int x) { return x < 0 ? -x : x; }
+
+constexpr int
+CalculateHeuristics(const std::array<int, kFlatBoardSize> &board) {
+  int dist = 0;
+  for (int i = 0; i < kFlatBoardSize; ++i) {
+    int value = board[i];
+    if (value == 0) {
+      continue;
+    }
+    int target_x = (value - 1) / kBoardSize;
+    int target_y = (value - 1) % kBoardSize;
+    int current_x = i / kBoardSize;
+    int current_y = i % kBoardSize;
+    dist += Absolute(current_x - target_x) + Absolute(current_y - target_y);
   }
   return dist;
 }
 
-bool IsSolvable(const Matrix<int>& board) {
-  std::vector<int> board_flat;
-  for (const auto& row : board) {
-    for (const auto& cell : row) {
-      if (cell != 0) {
-        board_flat.push_back(cell);
-      }
+constexpr int MoveZero(int zero_positon, int direction) {
+  int new_zero_position = zero_positon + kDirecions[direction];
+  if (direction < 2) {
+    if (new_zero_position < 0 || new_zero_position >= kFlatBoardSize) {
+      return -1;
     }
-  }
-  int sum_of_bigger_before = 0;
-  for (size_t i = 0; i < board_flat.size(); ++i) {
-    for (size_t j = i + 1; j < board_flat.size(); ++j) {
-      if (board_flat[i] > board_flat[j]) {
-        ++sum_of_bigger_before;
-      }
+    if ((zero_positon / kBoardSize) != (new_zero_position / kBoardSize)) {
+      return -1;
     }
-  }
-  return sum_of_bigger_before % 2 == 0;
-}
-
-void SolvePuzzle(const Matrix<int>& start) {
-  PriorityQueue<Puzzle> pq;
-  StrUnorderedSet visited;
-
-  int start_x = 0;
-  int start_y = 0;
-  for (int i = 0; i < kBoardSize; ++i) {
-    for (int j = 0; j < kBoardSize; ++j) {
-      if (start[i][j] == 0) {
-        start_x = i;
-        start_y = j;
-      }
-    }
-  }
-
-  pq.emplace(start, start_x, start_y, CalculateDist(start), kEmptyString);
-
-  while (!pq.empty()) {
-    Puzzle current = pq.top();
-    pq.pop();
-
-    if (current.board == kGoal) {
-      std::cout << current.path.size() << '\n';
-      std::cout << current.path << '\n';
-      return;
-    }
-
-    std::string current_state;
-    for (const auto& row : current.board) {
-      for (const auto& cell : row) {
-        current_state += std::to_string(cell);
-      }
-    }
-
-    if (visited.find(current_state) != visited.end()) {
-      continue;
-    }
-    visited.insert(current_state);
-
-    for (int i = 0; i < kDirectionsNumber; ++i) {
-      int new_x = current.x + kDirections[i].first;
-      int new_y = current.y + kDirections[i].second;
-
-      if (new_x >= 0 && new_x < kBoardSize && new_y >= 0 &&
-          new_y < kBoardSize) {
-        Matrix<int> new_board = current.board;
-        std::swap(new_board[current.x][current.y], new_board[new_x][new_y]);
-        pq.emplace(new_board, new_x, new_y, CalculateDist(new_board),
-                   current.path + kDirectionsLetters[i]);
-      }
-    }
-  }
-}
-
-int main() {
-  Matrix<int> start = InputBoard();
-
-  if (IsSolvable(start)) {
-    SolvePuzzle(start);
   } else {
-    std::cout << -1 << '\n';
+    if (new_zero_position < 0 || new_zero_position >= kFlatBoardSize) {
+      return -1;
+    }
   }
+  return new_zero_position;
+}
+
+template <int MaxDepth> struct Solver {
+  const std::array<int, kFlatBoardSize> &board;
+  int init_zero_position;
+
+  constexpr Solver(const std::array<int, kFlatBoardSize> &board,
+                   int zero_position)
+      : board(board), init_zero_position(zero_position) {}
+
+  constexpr bool DFS(std::array<int, kFlatBoardSize> &current_state,
+                     int zero_positon, int g, int bound,
+                     int last_direction) const {
+    int h = CalculateHeuristics(current_state);
+    if (g + h > bound) {
+      return false;
+    }
+
+    if (h == 0) {
+      return true;
+    }
+
+    for (int direction = 0; direction < 4; ++direction) {
+      if ((direction ^ 1) == last_direction) {
+        continue;
+      }
+      int new_zero_position = MoveZero(zero_positon, direction);
+      if (new_zero_position < 0) {
+        continue;
+      }
+
+      int tmp = current_state[new_zero_position];
+      current_state[new_zero_position] = 0;
+      current_state[zero_positon] = tmp;
+
+      if (DFS(current_state, new_zero_position, g + 1, bound, direction)) {
+        return true;
+      }
+
+      current_state[zero_positon] = 0;
+      current_state[new_zero_position] = tmp;
+    }
+    return false;
+  }
+
+  constexpr int Solve() const {
+    std::array<int, kFlatBoardSize> current_state = board;
+    int bound = CalculateHeuristics(current_state);
+    if (bound == 0) {
+      return 0;
+    }
+    for (int depth = bound; depth <= MaxDepth; ++depth) {
+      if (DFS(current_state, init_zero_position, 0, depth, -1)) {
+        return depth;
+      }
+    }
+    return -1;
+  }
+};
+
+constexpr int SolutionLength(const std::array<int, kFlatBoardSize> &board) {
+  if (!IsValid(board)) {
+    return -2;
+  }
+  if (!IsSolvable(board)) {
+    return -1;
+  }
+
+  int zero_position = 0;
+  for (int i = 0; i < kFlatBoardSize; ++i) {
+    if (board[i] == 0) {
+      zero_position = i;
+      break;
+    }
+  }
+
+  constexpr int kMaxDepth = 31;
+  return Solver<kMaxDepth>(board, zero_position).Solve();
 }
