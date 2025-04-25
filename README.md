@@ -1,1 +1,3 @@
-# Homework for C++ course completed in the 3rd and the 4th semester
+# C++ Practice
+
+This repository contains homework assignments from the full Programming in **C++** course at MIPT completed over semesters 3 to 4.  
