@@ -129,13 +129,11 @@ class SharedPtr {
 
   template <class Y>
   SharedPtr& operator=(const SharedPtr<Y>& other) noexcept {
-    if (this != reinterpret_cast<const SharedPtr*>(&other)) {
-      reset();
-      ptr_ = static_cast<T*>(other.ptr_);
-      counter_ = (other.counter_);
-      if (counter_) {
-        counter_->increase_strong_count();
-      }
+    reset();
+    ptr_ = static_cast<T*>(other.ptr_);
+    counter_ = (other.counter_);
+    if (counter_) {
+      counter_->increase_strong_count();
     }
     return *this;
   }
