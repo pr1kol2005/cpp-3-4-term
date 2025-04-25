@@ -5,3 +5,6 @@
 !array/array.
 !list/list.
 !unordered_map/unordered_map.
+!smart_pointers/smart_pointers.
+!config/*.hpp
+!ct_game/ct_game.
