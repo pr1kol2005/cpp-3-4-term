@@ -17,7 +17,7 @@ struct ControlBlock {
   virtual ~ControlBlock() = default;
 
   void increase_strong_count() { ++strong_count; }
-  void decrease_strong_count() {
+  void release_strong_reference() {
     --strong_count;
     if (strong_count == 0) {
       dispose();
@@ -29,7 +29,7 @@ struct ControlBlock {
   }
 
   void increase_weak_count() { ++weak_count; }
-  void decrease_weak_count() {
+  void release_weak_reference() {
     --weak_count;
     if (strong_count == 0 && weak_count == 0) {
       destroy();
@@ -181,7 +181,7 @@ class SharedPtr {
 
   void reset(T* pointer = nullptr) {
     if (counter_ != nullptr) {
-      counter_->decrease_strong_count();
+      counter_->release_strong_reference();
     }
     ptr_ = pointer;
     counter_ = pointer ? ControlBlockWithPtr<T>::create(pointer) : nullptr;
@@ -291,7 +291,7 @@ class WeakPtr {
 
   void reset() {
     if (counter_ != nullptr) {
-      counter_->decrease_weak_count();
+      counter_->release_weak_reference();
     }
     ptr_ = nullptr;
     counter_ = nullptr;
