@@ -48,8 +48,8 @@ class SettingInterface {
   }
 
   template <typename T>
-  static auto GetValueAsStringImpl(void* self)
-    requires requires(T object) { std::boolalpha << object; }
+  static std::string GetValueAsStringImpl(void* self)
+    requires requires(T object, std::ostream& os) { os << object; }
   {
     auto* setting = static_cast<Setting<T>*>(self);
     std::stringstream ss;
@@ -61,8 +61,8 @@ class SettingInterface {
   }
 
   template <typename T>
-  static auto GetValueAsStringImpl(void*)
-    requires (!requires(T object) { std::boolalpha << object; })
+  static std::string GetValueAsStringImpl(void*)
+    requires(!requires(T object, std::ostream& os) { os << object; })
   {
     throw BadConfigValueType("Type doesn't support output operator");
   }
@@ -74,8 +74,8 @@ class SettingInterface {
   }
 
   template <typename T>
-  static auto SetValueAsStringImpl(void* self, const std::string& value)
-    requires requires(T object) { std::boolalpha >> object; }
+  static void SetValueAsStringImpl(void* self, const std::string& value)
+    requires requires(T object, std::istream& is) { is >> object; }
   {
     auto* setting = static_cast<Setting<T>*>(self);
     std::stringstream ss(value);
@@ -85,8 +85,8 @@ class SettingInterface {
   }
 
   template <typename T>
-  static auto SetValueAsStringImpl(void* self, const std::string&)
-    requires (!requires(T object) { std::boolalpha >> object; }) 
+  static void SetValueAsStringImpl(void* self, const std::string&)
+    requires(!requires(T object, std::istream& is) { is >> object; })
   {
     throw BadConfigValueType("Type doesn't support input operator" +
                              static_cast<Setting<T>*>(self)->name_);
