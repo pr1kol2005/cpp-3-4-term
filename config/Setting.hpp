@@ -94,19 +94,17 @@ class Setting {
   bool HasValue() const { return value_.has_value(); }
 
   T& GetValue() {
-    try {
+    if (value_.has_value()) {
       return value_.value();
-    } catch (...) {
-      throw BadSettingAccess("No value");
     }
+    throw BadSettingAccess("No value");
   }
 
   const T& GetValue() const {
-    try {
+    if (value_.has_value()) {
       return value_.value();
-    } catch (...) {
-      throw BadSettingAccess("No value");
     }
+    throw BadSettingAccess("No value");
   }
 
    private:

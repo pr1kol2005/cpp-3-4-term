@@ -1,7 +1,5 @@
 #pragma once
 
-// #include <yaml-cpp/yaml.h>
-
 #include <fstream>
 #include <memory>
 #include <optional>
@@ -24,30 +22,6 @@ struct MainConfiguratorTag {};
 
 template <typename T, typename ConfiguratorTag = MainConfiguratorTag>
 class Setting;
-
-// ANCHOR : Traits
-template <typename T, typename = void>
-struct has_output_operator : std::false_type {};
-
-template <typename T>
-struct has_output_operator<T, std::void_t<decltype(std::declval<std::ostream&>()
-                                                   << std::declval<T>())> >
-    : std::true_type {};
-
-template <typename T>
-inline constexpr bool has_output_operator_v = has_output_operator<T>::value;
-
-template <typename T, typename = void>
-struct has_input_operator : std::false_type {};
-
-template <typename T>
-struct has_input_operator<
-    T,
-    std::void_t<decltype(std::declval<std::istream&>() >> std::declval<T&>())> >
-    : std::true_type {};
-
-template <typename T>
-inline constexpr bool has_input_operator_v = has_input_operator<T>::value;
 
 // ANCHOR : SettingInterface
 class SettingInterface {
@@ -75,7 +49,8 @@ class SettingInterface {
 
   template <typename T>
   static auto GetValueAsStringImpl(void* self)
-      -> std::enable_if_t<has_output_operator_v<T>, std::string> {
+    requires requires(T object) { std::boolalpha << object; }
+  {
     auto* setting = static_cast<Setting<T>*>(self);
     std::stringstream ss;
     if (setting->HasValue()) {
@@ -87,7 +62,8 @@ class SettingInterface {
 
   template <typename T>
   static auto GetValueAsStringImpl(void*)
-      -> std::enable_if_t<!has_output_operator_v<T>, std::string> {
+    requires (!requires(T object) { std::boolalpha << object; })
+  {
     throw BadConfigValueType("Type doesn't support output operator");
   }
 
@@ -99,7 +75,8 @@ class SettingInterface {
 
   template <typename T>
   static auto SetValueAsStringImpl(void* self, const std::string& value)
-      -> std::enable_if_t<has_input_operator_v<T>, void> {
+    requires requires(T object) { std::boolalpha >> object; }
+  {
     auto* setting = static_cast<Setting<T>*>(self);
     std::stringstream ss(value);
     T object;
@@ -109,7 +86,8 @@ class SettingInterface {
 
   template <typename T>
   static auto SetValueAsStringImpl(void* self, const std::string&)
-      -> std::enable_if_t<!has_input_operator_v<T>, void> {
+    requires (!requires(T object) { std::boolalpha >> object; }) 
+  {
     throw BadConfigValueType("Type doesn't support input operator" +
                              static_cast<Setting<T>*>(self)->name_);
   }
@@ -225,25 +203,6 @@ class Configurator {
                                               value);
     }
   }
-
-  // void Init(const std::string& filename) {
-  //   std::map<std::string, std::string> conf_values;
-
-  //   try {
-  //     YAML::Node config = YAML::LoadFile(filename);
-
-  //     for (const auto& entry : config) {
-  //       std::string key = entry.first.as<std::string>();
-  //       std::string value = entry.second.as<std::string>();
-  //       conf_values[key] = value;
-  //     }
-  //   } catch (const YAML::Exception& exception) {
-  //     throw std::runtime_error("Failed to parse YAML file: " +
-  //                              std::string(exception.what()));
-  //   }
-
-  //   Init(conf_values);
-  // }
 
   void Drop(const std::string& name) {
     auto it = AccessSetting(name);
