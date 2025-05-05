@@ -257,6 +257,7 @@ class Variant : private VariantFieldBase<Types...>,
 
   Variant& operator=(const Variant& other) {
     if (&other != this) {
+      data.destroy(active_index);
       active_index = other.active_index;
       copy_helper<0>(other);
     }
@@ -265,6 +266,7 @@ class Variant : private VariantFieldBase<Types...>,
 
   Variant& operator=(Variant&& other) noexcept {
     if (&other != this) {
+      data.destroy(active_index);
       active_index = other.active_index;
       move_helper<0>(std::move(other));
     }
