@@ -235,7 +235,9 @@ class Variant : private VariantFieldBase<Types...>,
   using VariantBase<Types, Variant<Types...>>::VariantBase...;
   using VariantBase<Types, Variant>::operator=...;
 
-  Variant(const Variant& other) {
+  Variant(const Variant& other)
+  : VariantFieldBase<Types...>(),
+  VariantBase<Types, Variant<Types...>>()... {
     active_index = other.active_index;
     copy_helper<0>(other);
   }
