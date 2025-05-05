@@ -54,7 +54,7 @@ union VariadicUnion<Head, Tail...> {
   T& emplace_construct(Args&&... args) {
     if constexpr (std::is_same_v<Head, T>) {
       return *std::construct_at(std::addressof(value),
-                                std::forward<Args>(args)...)
+                                std::forward<Args>(args)...);
     } else {
       return tail.template emplace_construct<T>(std::forward<Args>(args)...);
     }
