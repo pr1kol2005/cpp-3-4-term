@@ -2,6 +2,7 @@
 
 #include <exception>
 #include <initializer_list>
+#include <memory>
 #include <utility>
 
 // ANCHOR - Variant forward declaration
@@ -52,8 +53,8 @@ union VariadicUnion<Head, Tail...> {
   template <typename T, typename... Args>
   T& emplace_construct(Args&&... args) {
     if constexpr (std::is_same_v<Head, T>) {
-      std::construct_at(&value, std::forward<Args>(args)...);
-      return value;
+      return *std::construct_at(std::addressof(value),
+                                std::forward<Args>(args)...)
     } else {
       return tail.template emplace_construct<T>(std::forward<Args>(args)...);
     }
@@ -61,7 +62,7 @@ union VariadicUnion<Head, Tail...> {
 
   void destroy(std::size_t active_index) {
     if (active_index == 0) {
-      std::destroy_at(&value);
+      std::destroy_at(std::addressof(value));
     } else {
       tail.destroy(active_index - 1);
     }
