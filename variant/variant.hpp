@@ -235,9 +235,17 @@ class Variant : private VariantFieldBase<Types...>,
   using VariantBase<Types, Variant<Types...>>::VariantBase...;
   using VariantBase<Types, Variant>::operator=...;
 
+  Variant()
+      : VariantFieldBase<Types...>(),
+        VariantBase<Types, Variant<Types...>>()... {
+    using first_type = typename VariantTraits<Variant>::template type<0>;
+    data.template emplace_construct<first_type>();
+    active_index = 0;
+  }
+
   Variant(const Variant& other)
-  : VariantFieldBase<Types...>(),
-  VariantBase<Types, Variant<Types...>>()... {
+      : VariantFieldBase<Types...>(),
+        VariantBase<Types, Variant<Types...>>()... {
     active_index = other.active_index;
     copy_helper<0>(other);
   }
