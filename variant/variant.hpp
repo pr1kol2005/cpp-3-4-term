@@ -4,6 +4,7 @@
 #include <initializer_list>
 #include <memory>
 #include <utility>
+#include <concepts>
 
 // ANCHOR - Variant forward declaration
 template <typename... Types>
@@ -34,7 +35,7 @@ union VariadicUnion<Head, Tail...> {
 
   template <typename T>
   const T& get() const& {
-    if constexpr (std::is_same_v<Head, T>) {
+    if constexpr (std::same_as<Head, T>) {
       return value;
     } else {
       return tail.template get<T>();
@@ -43,7 +44,7 @@ union VariadicUnion<Head, Tail...> {
 
   template <typename T>
   T&& get() && {
-    if constexpr (std::is_same_v<Head, T>) {
+    if constexpr (std::same_as<Head, T>) {
       return std::move(value);
     } else {
       return std::move(tail).template get<T>();
@@ -52,7 +53,7 @@ union VariadicUnion<Head, Tail...> {
 
   template <typename T, typename... Args>
   T& emplace_construct(Args&&... args) {
-    if constexpr (std::is_same_v<Head, T>) {
+    if constexpr (std::same_as<Head, T>) {
       return *std::construct_at(std::addressof(value),
                                 std::forward<Args>(args)...);
     } else {
@@ -147,7 +148,7 @@ struct VariantBase {
   }
 
   template <typename U>
-    requires std::is_constructible_v<T, U&&>
+    requires std::constructible_from<T, U&&>
   VariantBase(U&& value) {
     auto* self = static_cast<Derived*>(this);
     self->data.template emplace_construct<T>(std::forward<U>(value));
@@ -277,7 +278,7 @@ class Variant : private VariantFieldBase<Types...>,
 
   // ANCHOR - emplace
   template <typename U, typename... Args>
-    requires std::is_constructible_v<U, Args...>
+    requires std::constructible_from<U, Args...>
   U& emplace(Args&&... args) {
     constexpr std::size_t kNewIndex =
         VariantTraits<Variant>::template kIndex<U>;
@@ -316,7 +317,7 @@ class Variant : private VariantFieldBase<Types...>,
 
 // ANCHOR - get<T>
 template <typename T, typename... Types>
-T& get(Variant<Types...>& var) {
+decltype(auto) get(Variant<Types...>& var) {
   if (var.active_index !=
       VariantTraits<Variant<Types...>>::template kIndex<T>) {
     throw BadVariantAccess{};
@@ -325,7 +326,7 @@ T& get(Variant<Types...>& var) {
 }
 
 template <typename T, typename... Types>
-const T& get(const Variant<Types...>& var) {
+decltype(auto) get(const Variant<Types...>& var) {
   if (var.active_index !=
       VariantTraits<Variant<Types...>>::template kIndex<T>) {
     throw BadVariantAccess{};
@@ -334,7 +335,7 @@ const T& get(const Variant<Types...>& var) {
 }
 
 template <typename T, typename... Types>
-T&& get(Variant<Types...>&& var) {
+decltype(auto) get(Variant<Types...>&& var) {
   if (std::move(var).active_index !=
       VariantTraits<Variant<Types...>>::template kIndex<T>) {
     throw BadVariantAccess{};
@@ -343,31 +344,10 @@ T&& get(Variant<Types...>&& var) {
 }
 
 // ANCHOR - get<I>
-template <std::size_t I, typename... Types>
-decltype(auto) get(Variant<Types...>& var) {
-  using ith_type = typename VariantTraits<Variant<Types...>>::template type<I>;
-  if (var.active_index != I) {
-    throw BadVariantAccess{};
-  }
-  return get<ith_type>(var);
-}
-
-template <std::size_t I, typename... Types>
-decltype(auto) get(const Variant<Types...>& var) {
-  using ith_type = typename VariantTraits<Variant<Types...>>::template type<I>;
-  if (var.active_index != I) {
-    throw BadVariantAccess{};
-  }
-  return get<ith_type>(var);
-}
-
-template <std::size_t I, typename... Types>
-decltype(auto) get(Variant<Types...>&& var) {
-  using ith_type = typename VariantTraits<Variant<Types...>>::template type<I>;
-  if (var.active_index != I) {
-    throw BadVariantAccess{};
-  }
-  return get<ith_type>(std::move(var));
+template <std::size_t I, typename Var>
+decltype(auto) get(Var&& var) {
+  using ith_type = typename VariantTraits<std::decay_t<Var>>::template type<I>;
+  return get<ith_type>(std::forward<Var>(var));
 }
 
 // ANCHOR - holds_alternative
@@ -379,61 +359,46 @@ bool holds_alternative(const Variant<Types...>& var) {
 
 // ANCHOR - visit
 namespace details {
-template <typename Visitor, typename VariantT, std::size_t... I>
-decltype(auto) visit_impl(Visitor&& vis, VariantT&& var,
+template <typename Visitor, typename Var, std::size_t... I>
+decltype(auto) visit_impl(Visitor&& vis, Var&& var,
                           std::index_sequence<I...> /*unused*/) {
-  using var_type = std::decay_t<VariantT>;
+  using var_type = std::decay_t<Var>;
 
   using res_type = decltype(std::forward<Visitor>(vis)(
       get<typename VariantTraits<var_type>::template type<0>>(
-          std::forward<VariantT>(var))));
+          std::forward<Var>(var))));
 
-  using func = res_type (*)(Visitor&&, VariantT&&);
+  using func = res_type (*)(Visitor&&, Var&&);
 
   static constexpr func kTable[] = {
-      +[](Visitor&& vis_nested, VariantT&& var_nested) -> res_type {
+      +[](Visitor&& vis_nested, Var&& var_nested) -> res_type {
         return std::forward<Visitor>(vis_nested)(
             get<typename VariantTraits<var_type>::template type<I>>(
-                std::forward<VariantT>(var_nested)));
+                std::forward<Var>(var_nested)));
       }...};
 
   return kTable[var.active_index](std::forward<Visitor>(vis),
-                                  std::forward<VariantT>(var));
+                                  std::forward<Var>(var));
 }
 }  // namespace details
 
-template <typename Visitor, typename... Types>
-decltype(auto) visit(Visitor&& vis, Variant<Types...>& var) {
+template <typename Visitor, typename Var>
+decltype(auto) visit(Visitor&& vis, Var&& var) {
   return details::visit_impl(
-      std::forward<Visitor>(vis), var,
-      std::make_index_sequence<VariantTraits<Variant<Types...>>::kLength>{});
+      std::forward<Visitor>(vis), std::forward<Var>(var),
+      std::make_index_sequence<VariantTraits<std::decay_t<Var>>::kLength>{});
 }
 
-template <typename Visitor, typename... Types>
-decltype(auto) visit(Visitor&& vis, const Variant<Types...>& var) {
-  return details::visit_impl(
-      std::forward<Visitor>(vis), var,
-      std::make_index_sequence<VariantTraits<Variant<Types...>>::kLength>{});
-}
-
-template <typename Visitor, typename... Types>
-decltype(auto) visit(Visitor&& vis, Variant<Types...>&& var) {
-  return details::visit_impl(
-      std::forward<Visitor>(vis), std::move(var),
-      std::make_index_sequence<VariantTraits<Variant<Types...>>::kLength>{});
-}
-
-template <typename Visitor, typename Var1, typename Var2, typename... Vars>
-decltype(auto) visit(Visitor&& vis, Var1&& var1, Var2&& var2, Vars&&... vars) {
+template <typename Visitor, typename Var, typename... Vars>
+decltype(auto) visit(Visitor&& vis, Var&& var, Vars&&... vars) {
   return visit(
-      [&](auto&& v1_val) -> decltype(auto) {
+      [&](auto&& var_val) -> decltype(auto) {
         return visit(
             [&](auto&&... rest_vals) -> decltype(auto) {
               return std::forward<Visitor>(vis)(
-                  std::forward<decltype(v1_val)>(v1_val),
+                  std::forward<decltype(var_val)>(var_val),
                   std::forward<decltype(rest_vals)>(rest_vals)...);
-            },
-            std::forward<Var2>(var2), std::forward<Vars>(vars)...);
+            }, std::forward<Vars>(vars)...);
       },
-      std::forward<Var1>(var1));
+      std::forward<Var>(var));
 }
